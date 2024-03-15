@@ -1,17 +1,18 @@
 // Copyright 2024 XMOS LIMITED.
 // This Software is subject to the terms of the XMOS Public Licence: Version 1.
-#include <print.h>
 #include <stdio.h>
-#include <xs1.h>
-#include <platform.h>
 #include <assert.h>
 #include <math.h>
+#include <stdint.h>
+
+#include <xs1.h>
+#include <platform.h>
+#include <print.h>
 
 #include "adc_pot.h"
-#include "app_main.h"
+#include "adc_utils.h"
 
-on tile[0]: port p_adc[] = ADC_PINS;
-
+#define debprintf(...) printf(...) 
 
 typedef enum adc_state_t{
         ADC_IDLE = 2,
@@ -23,20 +24,22 @@ typedef enum adc_state_t{
 static inline uint16_t post_process_result( uint16_t raw_result,
                                             uint16_t *conversion_history,
                                             uint16_t *hysteris_tracker,
-                                            unsigned adc_idx){
-    // const int max_result_scale = (1 << ADC_BITS_TARGET) - 1;
+                                            unsigned adc_idx,
+                                            size_t num_adc){
 
-    // Apply filter. First populate filter history.
     static unsigned filter_write_idx = 0;
     static unsigned filter_stable = 0;
+
+    // Apply filter. First populate filter history.
     unsigned offset = adc_idx * RESULT_HISTORY_DEPTH + filter_write_idx;
     *(conversion_history + offset) = raw_result;
-    if(adc_idx == ADC_NUM_CHANNELS - 1){
+    if(adc_idx == num_adc - 1){
         if(++filter_write_idx == RESULT_HISTORY_DEPTH){
             filter_write_idx = 0;
             filter_stable = 1;
         }
     }
+
     // Apply moving average filter
     uint32_t accum = 0;
     uint16_t *hist_ptr = conversion_history + adc_idx * RESULT_HISTORY_DEPTH;
@@ -45,8 +48,6 @@ static inline uint16_t post_process_result( uint16_t raw_result,
         hist_ptr++;
     }
     uint16_t filtered_result = (accum / RESULT_HISTORY_DEPTH);
-
-    // return filtered_result;
 
     // Apply hysteresis
     if(filtered_result > hysteris_tracker[adc_idx] + RESULT_HYSTERESIS || filtered_result == NUM_CAL){
@@ -65,7 +66,7 @@ static inline uint16_t post_process_result( uint16_t raw_result,
 unsigned gen_lookup(uint16_t up[], uint16_t down[], unsigned num_points,
                     float r_ohms, float capacitor_f, float rs_ohms,
                     float v_rail, float v_thresh){
-    printstrln("gen_lookup");
+    printf("gen_lookup\n");
     unsigned max_ticks = 0;
     //TODO rs_ohms
     printf("r_ohms: %f capacitor_f: %f v_rail: %f v_thresh: %f\n", r_ohms, capacitor_f * 1e12, v_rail, v_thresh);
@@ -142,55 +143,34 @@ static inline unsigned lookup(int is_up, uint16_t ticks, uint16_t up[], uint16_t
 }
 
 
-void cal_threshold(port p_adc){
-    int hist[RESULT_HISTORY_DEPTH] = {0};
-    int idx = 0;
-    while(1){
-        int tmp;
-        p_adc :> tmp;
-        hist[idx] = tmp * 100;
-        if(++idx == RESULT_HISTORY_DEPTH){
-            idx = 0;
-        }
-        int accum = 0;
-        for(int i=0; i< RESULT_HISTORY_DEPTH; i++){
-            accum += hist[i];
-        } 
-        accum /= RESULT_HISTORY_DEPTH;
-        printintln(accum);
-        delay_milliseconds(10);
-    }
-}
-
-void adc_pot_task(chanend c_adc){
-    printstrln("adc_pot_task");
+void adc_pot_task(chanend c_adc, port p_adc[], size_t num_adc){
+    printf("adc_pot_task\n");
   
     // Current conversion index
     unsigned adc_idx = 0;
-    uint16_t results[ADC_NUM_CHANNELS] = {0}; // The ADC read values
+    uint16_t results[ADC_MAX_NUM_CHANNELS] = {0}; // The ADC read values
 
     timer tmr_charge;
     timer tmr_discharge;
     timer tmr_overshoot;
 
     // Set all ports to input and set drive strength
-    const int port_drive = DRIVE_8MA;
-    for(int i = 0; i < ADC_NUM_CHANNELS; i++){
+    const int port_drive = DRIVE_4MA;
+    for(int i = 0; i < num_adc; i++){
         unsigned dummy;
         p_adc[i] :> dummy;
         set_pad_properties(p_adc[i], port_drive, PULL_NONE, 0, 0);
 
     }
 
-
-    const int capacitor_pf = 4000;
-    const int resistor_ohms = 47000; // nominal maximum value ned to end
-    const int resistor_tol_pc = 20; // TODO add
-    const int resistor_series_ohms = 470;
+    const unsigned capacitor_pf = 4000;
+    const unsigned resistor_ohms = 47000; // nominal maximum value ned to end
+    const unsigned resistor_series_ohms = 470;
 
     const float v_rail = 3.3;
     const float v_thresh = 1.18;
-    const unsigned port_time_offset = 20; // How long approx minimum time to trigger port select
+
+    const unsigned port_time_offset = 30; // How long approx minimum time to trigger port select. Not too critcial a parameter.
 
     const int rc_times_to_charge_fully = 10; // 5 RC times should be sufficient but double it for best accuracy
     const uint32_t max_charge_period_ticks = ((uint64_t)rc_times_to_charge_fully * capacitor_pf * resistor_ohms / 2) / 10000;
@@ -213,9 +193,10 @@ void adc_pot_task(chanend c_adc){
 
 
     // Post processing variables
-    uint16_t conversion_history[ADC_NUM_CHANNELS][RESULT_HISTORY_DEPTH] = {{0}};
-    uint16_t hysteris_tracker[ADC_NUM_CHANNELS] = {0};
+    uint16_t conversion_history[ADC_MAX_NUM_CHANNELS][RESULT_HISTORY_DEPTH] = {{0}};
+    uint16_t hysteris_tracker[ADC_MAX_NUM_CHANNELS] = {0};
 
+    printuintln(sizeof(conversion_history));
  
     adc_state_t adc_state = ADC_IDLE;
 
@@ -256,13 +237,13 @@ void adc_pot_task(chanend c_adc){
                 int t0, t1;
                 tmr_charge :> t0; 
                 uint16_t result = lookup(init_port_val, conversion_time, cal_up, cal_down, NUM_CAL, port_time_offset);
-                uint16_t post_proc_result = post_process_result(result, conversion_history[0], hysteris_tracker, adc_idx);
+                uint16_t post_proc_result = post_process_result(result, (uint16_t *)conversion_history, hysteris_tracker, adc_idx, num_adc);
                 results[adc_idx] = post_proc_result;
                 tmr_charge :> t1; 
                 printf("ticks: %u result: %u post_proc: %u ticks: %u is_up: %d proc_ticks: %d\n", conversion_time, result, post_proc_result, conversion_time, init_port_val, t1-t0);
 
 
-                if(++adc_idx == ADC_NUM_CHANNELS){
+                if(++adc_idx == num_adc){
                     adc_idx = 0;
                 }
                 time_trigger_charge += ADC_READ_INTERVAL;
@@ -273,12 +254,25 @@ void adc_pot_task(chanend c_adc){
             case adc_state == ADC_CONVERTING => tmr_overshoot when timerafter(time_trigger_overshoot) :> int _:
                 p_adc[adc_idx] :> int _ @ end_time;
                 printf("result: %u overshoot\n", overshoot_idx);
-                if(++adc_idx == ADC_NUM_CHANNELS){
+                if(++adc_idx == num_adc){
                     adc_idx = 0;
                 }
                 time_trigger_charge += ADC_READ_INTERVAL;
 
                 adc_state = ADC_IDLE;
+            break;
+
+            case c_adc :> uint32_t command:
+                switch(command & ADC_CMD_MASK){
+                    case ADC_CMD_READ:
+                        uint32_t ch = command & (~ADC_CMD_MASK);
+                        printf("read ch: %lu \n", ch);
+                        c_adc <: (uint32_t)results[ch];
+                    break;
+                    default:
+                        assert(0);
+                    break;
+                }
             break;
         }
     } // while 1
