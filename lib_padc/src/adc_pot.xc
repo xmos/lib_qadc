@@ -7,7 +7,7 @@
 #include <assert.h>
 #include <math.h>
 
-#include "adc_task.h"
+#include "adc_pot.h"
 #include "app_main.h"
 
 on tile[0]: port p_adc[] = ADC_PINS;
@@ -162,8 +162,8 @@ void cal_threshold(port p_adc){
     }
 }
 
-void adc_task(chanend c_adc){
-    printstrln("adc_task");
+void adc_pot_task(chanend c_adc){
+    printstrln("adc_pot_task");
   
     // Current conversion index
     unsigned adc_idx = 0;

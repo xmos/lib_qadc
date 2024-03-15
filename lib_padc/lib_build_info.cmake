@@ -1,0 +1,6 @@
+set(LIB_NAME lib_padc)
+set(LIB_VERSION 0.0.1)
+set(LIB_INCLUDES api)
+set(LIB_COMPILER_FLAGS -Os)
+
+XMOS_REGISTER_MODULE()

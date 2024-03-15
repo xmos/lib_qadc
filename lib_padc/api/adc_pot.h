@@ -27,8 +27,8 @@
 #define ADC_CMD_MASK                0xff000000
 
 #ifdef __XC__
-void adc_task(chanend c_adc);
+void adc_pot_task(chanend c_adc);
 #else
 DECLARE_JOB(adc_task, (chanend_t));
-void adc_task(chanend_t c_adc);
+void adc_pot_task(chanend_t c_adc);
 #endif
