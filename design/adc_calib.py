@@ -138,7 +138,7 @@ class qadc_pot:
             v_charge_l = rp_driving_low / (rp_driving_low + r_high) * v_rail
 
             # Calculate time to for cap to reach threshold from charge volatage
-            v_pot = i / n_lookup * v_rail + phi
+            v_pot = i / (n_lookup - 1) * v_rail + phi
             logval_down = 1 - (v_charge_h - v_thresh) / (v_rail - v_pot)
             t_down = 0 if logval_down <= 0 else (-r_parallel) * capacitor_f * math.log(logval_down)
             logval_up = 1 - ((v_thresh - v_charge_l) / v_pot)

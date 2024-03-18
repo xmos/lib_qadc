@@ -7,7 +7,7 @@
 
 #include "adc_pot.h"
 
-on tile[0]: port p_adc[] = {XS1_PORT_1A, XS1_PORT_1D}; // Sets which pins are to be used (channels 0..n) and defines channel count.  // X0D00, 11;
+on tile[0]: port p_adc[] = {XS1_PORT_1A, XS1_PORT_1D}; // Sets which pins are to be used (channels 0..n)  // X0D00, 11;
 
 
 void control_task(chanend c_adc){

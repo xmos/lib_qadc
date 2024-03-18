@@ -70,11 +70,11 @@ unsigned gen_lookup(uint16_t up[], uint16_t down[], unsigned num_points,
     unsigned max_ticks = 0;
     //TODO rs_ohms
     printf("r_ohms: %f capacitor_f: %f v_rail: %f v_thresh: %f\n", r_ohms, capacitor_f * 1e12, v_rail, v_thresh);
-    const float phi = 2e-38;
+    const float phi = 1e-10;
     for(unsigned i = 0; i < num_points + 1; i++){
         // Calculate equivalent resistance of pot
-        float r_low = r_ohms * (i + phi) / num_points;  
-        float r_high = r_ohms * ((num_points - i) + phi) / num_points;  
+        float r_low = r_ohms * (i + phi) / (num_points - 1);  
+        float r_high = r_ohms * ((num_points - i) + phi) / (num_points - 1);  
         float r_parallel = 1 / (1 / r_low + 1 / r_high); // When reading the equivalent resistance of pot is this
 
         // Calculate equivalent resistances when charging via Rs
@@ -86,7 +86,7 @@ unsigned gen_lookup(uint16_t up[], uint16_t down[], unsigned num_points,
         float v_charge_l = rp_low / (rp_low + r_high) * v_rail;
 
         // Calculate time to for cap to reach threshold from charge volatage
-        float v_pot = (float)i / num_points * v_rail;
+        float v_pot = (float)i / (num_points - 1) * v_rail + phi;
         float t_down = (-r_parallel) * capacitor_f * log(1 - (v_charge_h - v_thresh) / (v_rail - v_pot));  
         float t_up = (-r_parallel) * capacitor_f * log(1 - ((v_thresh - v_charge_l) / v_pot));
 
@@ -240,7 +240,7 @@ void adc_pot_task(chanend c_adc, port p_adc[], size_t num_adc, adc_pot_config_t 
                 uint16_t post_proc_result = post_process_result(result, (uint16_t *)conversion_history, hysteris_tracker, adc_idx, num_adc);
                 results[adc_idx] = post_proc_result;
                 tmr_charge :> t1; 
-                printf("ticks: %u result: %u post_proc: %u ticks: %u is_up: %d proc_ticks: %d\n", conversion_time, result, post_proc_result, conversion_time, init_port_val, t1-t0);
+                // printf("ticks: %u result: %u post_proc: %u ticks: %u is_up: %d proc_ticks: %d\n", conversion_time, result, post_proc_result, conversion_time, init_port_val, t1-t0);
 
 
                 if(++adc_idx == num_adc){
@@ -266,7 +266,6 @@ void adc_pot_task(chanend c_adc, port p_adc[], size_t num_adc, adc_pot_config_t 
                 switch(command & ADC_CMD_MASK){
                     case ADC_CMD_READ:
                         uint32_t ch = command & (~ADC_CMD_MASK);
-                        printf("read ch: %lu \n", ch);
                         c_adc <: (uint32_t)results[ch];
                     break;
                     default:

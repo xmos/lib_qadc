@@ -5,8 +5,6 @@
 #include <stdint.h>
 #include <stdio.h>
 
-clock cl_pwm = XS1_CLKBLK_5;
-
 // Utility to find threshold voltage on port connected with long RC constant (longer than 0.001)
 // When we are around the threshold point we can find it by driving PWM to see where the transition is
 // Run at 1MHz to ensure accuracy and low ripple

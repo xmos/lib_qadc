@@ -24,7 +24,7 @@ typedef struct adc_pot_config_t{
 
 
 // ADC operation
-#define ADC_READ_INTERVAL           (100 * XS1_TIMER_KHZ)   // Time in between individual conversions 1ms with 10nf / 10k is practical minimum
+#define ADC_READ_INTERVAL           (1 * XS1_TIMER_KHZ)   // Time in between individual conversions 1ms with 10nf / 10k is practical minimum
 #define LOOKUP_SIZE                 1024                    // Max 4096 to avoid code bloat and slow post processing
 #define RESULT_HISTORY_DEPTH        32                     // For filtering raw conversion values. Tradeoff between conversion speed and noise
 #define RESULT_HYSTERESIS           2                      // Reduce final output noise. Applies a small "dead zone" to current setting
