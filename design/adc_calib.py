@@ -34,6 +34,7 @@ class qadc_rheo:
         self.max_ticks = 0
         self.v_rail = v_rail
         self.v_thresh = v_thresh
+        self.n_lookup = n_lookup
 
         phi = 1e-10 # avoid / 0
         XS1_TIMER_HZ = 100e6
@@ -42,26 +43,26 @@ class qadc_rheo:
         max_ticks = 0
 
         positions = range(n_lookup)
+        down = [0] * n_lookup
         for i in positions:
             # Calculate equivalent resistance of pot
-            r_pot = r_pot_ohms * i / (n_lookup - 1)
+            r_pot = r_rheo_ohms * i / (n_lookup - 1)
 
             # Calculate equivalent resistances when charging via Rs
-            r_driving_low = 1 / (1 / r_pot + 1 / rs_ohms)
+            r_driving_low = 1 / (1 / (r_pot+phi) + 1 / rs_ohms)
             r_driving_high = rs_ohms
 
             # Calculate actual charge voltage of capacitor when using series resistor
             v_charge_h = r_pot / (r_pot + r_driving_high) * v_rail
-            v_charge_l = 0
 
             # Calculate time to for cap to reach threshold from charge volatage
-            logval_down = 1 - v_charge_h / v_thresh
-            t_down = 0 if logval_down <= 0 else (-r_parallel) * capacitor_f * math.log(logval_down)
+            logval_down = 1 - (v_charge_h - v_thresh) / (v_charge_h + phi)
+            t_down = 0 if logval_down <= 0 else (-r_pot) * capacitor_f * math.log(logval_down)
         
             # Convert to 100MHz timer ticks
             t_down_ticks = 0 if t_down < 0 else int(t_down * XS1_TIMER_HZ)
 
-            print(f"LUT idx: {i} v_charge_h: {v_charge_h:.2f} t_down: {t_down_ticks}")
+            # print(f"LUT idx: {i} v_charge_h: {v_charge_h:.2f} t_down: {t_down_ticks}")
 
             down[i] = t_down_ticks
             max_ticks = max(down[i], max_ticks)
@@ -71,17 +72,19 @@ class qadc_rheo:
         self.down = down
         positions = [p / (n_lookup - 1) for p in list(positions)] #normalise from 0-1
 
-        plot_curve(positions, (up, down), "ticks_versus_slider")
+        plot_curve(positions, [down], "ticks_versus_slider")
 
     def lookup_posn_from_ticks(self, ticks, model=None):
-        if model is None:
-            model = (self.up, self.n_lookup)
 
-        up = model[0]
-        n_lookup = model[2]
+        if model is None or model is False:
+            model = (self.down, self.n_lookup)
 
-        if start_high:
-            idx = n_lookup - 1 - np.argmax(np.flip(up) >= ticks)
+        down = model[0]
+        n_lookup = model[1]
+
+        if max(down) < ticks:
+            # Overshoot
+            idx = self.n_lookup - 1
         else:
             idx = np.argmax(np.array(down) >= ticks)
 
@@ -89,19 +92,13 @@ class qadc_rheo:
 
     def get_ticks_and_dir_from_posn(self, posn, v_thresh_noise_mv=0.0001):
         idx = int(posn * (self.n_lookup - 1))
+        
+        #this is ignored for now in this class
         v_thresh_noise = np.random.triangular(-v_thresh_noise_mv, 0, v_thresh_noise_mv, 1)
-        start_high = True if posn * self.v_rail > (self.v_thresh + v_thresh_noise) else False
+        ticks = self.down[idx]
 
-        if start_high:
-            ticks = self.up[idx]
-        else:
-            ticks = self.down[idx]
+        return (ticks,)
 
-        return ticks, start_high
-
-
-    def get_lookup(self):
-        return tuple(self.up, self.down, self.n_lookup)
 
 
 class qadc_pot:
@@ -151,7 +148,7 @@ class qadc_pot:
             t_down_ticks = 0 if t_down < 0 else int(t_down * XS1_TIMER_HZ)
             t_up_ticks = 0 if t_up < 0 else int(t_up * XS1_TIMER_HZ)
 
-            print(f"LUT idx: {i} r_parallel: {r_parallel:.1f} v_pot: {v_pot:.2f} v_charge_h: {v_charge_h:.2f} c_charge_l: {v_charge_l:.2f} t_down: {t_down_ticks} t_up: {t_up_ticks}")
+            # print(f"LUT idx: {i} r_parallel: {r_parallel:.1f} v_pot: {v_pot:.2f} v_charge_h: {v_charge_h:.2f} v_charge_l: {v_charge_l:.2f} t_down: {t_down_ticks} t_up: {t_up_ticks}")
 
             up[i] = t_up_ticks
             down[i] = t_down_ticks
@@ -194,14 +191,10 @@ class qadc_pot:
         return ticks, start_high
 
 
-    def get_lookup(self):
-        return tuple(self.up, self.down, self.n_lookup)
-
-
 def sim_sweep(model_cal, models_used, num_points=100):
-    if isinstance(models_used, padc_pot):
+    if isinstance(models_used, type(model_cal)) == 1:
         num_models = 1
-        models_used = [models_used]
+        models_used =[models_used]
     else:
         num_models = len(models_used)
 
@@ -211,13 +204,13 @@ def sim_sweep(model_cal, models_used, num_points=100):
 
     idx = 0
     for posn in positions:
-        ticks, start_high = model_cal.get_ticks_and_dir_from_posn(posn, v_thresh_noise_mv=0.08)
-        est_posn = model_cal.lookup_posn_from_ticks(ticks, start_high)
+        lut = model_cal.get_ticks_and_dir_from_posn(posn, v_thresh_noise_mv=0.08)
+        est_posn = model_cal.lookup_posn_from_ticks(*lut)
         est_positions[idx] = est_posn
 
         for m in range(num_models):
             model = models_used[m]
-            err_posn = model.lookup_posn_from_ticks(ticks, start_high)
+            err_posn = model.lookup_posn_from_ticks(*lut)
             err_positions[m][idx] = err_posn
 
         idx += 1
@@ -225,20 +218,6 @@ def sim_sweep(model_cal, models_used, num_points=100):
     err_positions = [err_positions[m] for m in range(num_models)]
     y_values = [est_positions] + err_positions      
     plot_curve(positions, y_values, figname = "Effect_of_pot_tolerance_20pc")
-
-
-def qadc_pot_test():
-    r_pot_nom = 47000
-    tolerance = 0.2
-    cap_pf = 3000
-    r_series = 470
-    v_rail = 3.3
-    v_thresh = 1.14
-
-    padc = padc_pot(cap_pf, r_pot_nom, r_series, 3.3, 1.14)
-    padc_pot_is_under = padc_pot(cap_pf, r_pot_nom * (1+tolerance), r_series, v_rail, v_thresh)
-    padc_pot_is_over = padc_pot(cap_pf, r_pot_nom * (1+tolerance), r_series, v_rail, v_thresh)
-    sim_sweep(padc, (padc_pot_is_under, padc_pot_is_over))
 
 
 def qadc_rheo_test():
@@ -249,11 +228,27 @@ def qadc_rheo_test():
     v_rail = 3.3
     v_thresh = 1.14
 
-    padc = padc_pot(cap_pf, r_pot_nom, r_series, 3.3, 1.14)
-    padc_pot_is_under = padc_pot(cap_pf, r_pot_nom * (1+tolerance), r_series, v_rail, v_thresh)
-    padc_pot_is_over = padc_pot(cap_pf, r_pot_nom * (1+tolerance), r_series, v_rail, v_thresh)
-    sim_sweep(padc, (padc_pot_is_under, padc_pot_is_over))
+    qadc = qadc_rheo(cap_pf, r_pot_nom, r_series, 3.3, v_thresh)
+    qadc_rheo_is_under = qadc_rheo(cap_pf, r_pot_nom / (1+tolerance), r_series, v_rail, v_thresh)
+    qadc_rheo_is_over = qadc_rheo(cap_pf, r_pot_nom * (1+tolerance), r_series, v_rail, v_thresh)
+    sim_sweep(qadc, (qadc_rheo_is_under, qadc_rheo_is_over))
+
+
+def qadc_pot_test():
+    r_pot_nom = 47000
+    tolerance = 0.2
+    cap_pf = 3000
+    r_series = 470
+    v_rail = 3.3
+    v_thresh = 1.14
+
+    qadc = qadc_pot(cap_pf, r_pot_nom, r_series, 3.3, v_thresh)
+    qadc_pot_is_under = qadc_pot(cap_pf, r_pot_nom / (1+tolerance), r_series, v_rail, v_thresh)
+    qadc_pot_is_over = qadc_pot(cap_pf, r_pot_nom * (1+tolerance), r_series, v_rail, v_thresh)
+    sim_sweep(qadc, (qadc_pot_is_under, qadc_pot_is_over))
+
 
 
 if __name__ == '__main__':
-    qadc_pot_test()
+    # qadc_pot_test()
+    qadc_rheo_test()
