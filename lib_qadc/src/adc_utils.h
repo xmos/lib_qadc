@@ -38,4 +38,6 @@
 #define set_pad_drive_mode(port, drive_mode)  {__asm__ __volatile__ ("setc res[%0], %1": : "r" (port) , "r" ((drive_mode << DRIVE_MODE_SHIFT) | \
                                                                                                             XS1_SETC_DRIVE_DRIVE)) ;}
 
+float find_threshold_level(float v_rail, port p_adc);
+
 #endif

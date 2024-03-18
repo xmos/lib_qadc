@@ -50,7 +50,7 @@ static inline uint16_t post_process_result( uint16_t raw_result,
     uint16_t filtered_result = (accum / RESULT_HISTORY_DEPTH);
 
     // Apply hysteresis
-    if(filtered_result > hysteris_tracker[adc_idx] + RESULT_HYSTERESIS || filtered_result == NUM_CAL){
+    if(filtered_result > hysteris_tracker[adc_idx] + RESULT_HYSTERESIS || filtered_result == LOOKUP_SIZE){
         hysteris_tracker[adc_idx] = filtered_result;
     }
     if(filtered_result < hysteris_tracker[adc_idx] - RESULT_HYSTERESIS || filtered_result == 0){
@@ -143,7 +143,7 @@ static inline unsigned lookup(int is_up, uint16_t ticks, uint16_t up[], uint16_t
 }
 
 
-void adc_pot_task(chanend c_adc, port p_adc[], size_t num_adc){
+void adc_pot_task(chanend c_adc, port p_adc[], size_t num_adc, adc_pot_config_t adc_config){
     printf("adc_pot_task\n");
   
     // Current conversion index
@@ -163,12 +163,12 @@ void adc_pot_task(chanend c_adc, port p_adc[], size_t num_adc){
 
     }
 
-    const unsigned capacitor_pf = 4000;
-    const unsigned resistor_ohms = 47000; // nominal maximum value ned to end
-    const unsigned resistor_series_ohms = 470;
+    const unsigned capacitor_pf = adc_config.capacitor_pf;
+    const unsigned resistor_ohms = adc_config.resistor_ohms;
+    const unsigned resistor_series_ohms = adc_config.resistor_series_ohms;
 
-    const float v_rail = 3.3;
-    const float v_thresh = 1.18;
+    const float v_rail = adc_config.v_rail;
+    const float v_thresh = adc_config.v_thresh;
 
     const unsigned port_time_offset = 30; // How long approx minimum time to trigger port select. Not too critcial a parameter.
 
@@ -183,12 +183,12 @@ void adc_pot_task(chanend c_adc, port p_adc[], size_t num_adc){
 
 
     // Generate calibration table
-    uint16_t cal_up[NUM_CAL + 1] = {0};
-    uint16_t cal_down[NUM_CAL + 1] = {0};
-    uint16_t max_table_ticks = gen_lookup(cal_up, cal_down, NUM_CAL,
+    uint16_t cal_up[LOOKUP_SIZE + 1] = {0};
+    uint16_t cal_down[LOOKUP_SIZE + 1] = {0};
+    uint16_t max_table_ticks = gen_lookup(cal_up, cal_down, LOOKUP_SIZE,
                                         (float)resistor_ohms, (float)capacitor_pf * 1e-12, (float)resistor_series_ohms,
                                         v_rail, v_thresh);
-    unsigned overshoot_idx = (unsigned)(v_thresh / v_rail * NUM_CAL);
+    unsigned overshoot_idx = (unsigned)(v_thresh / v_rail * LOOKUP_SIZE);
     printf("max_charge_period_ticks: %lu max_discharge_period_ticks: %lu max_table_ticks: %u\n", max_charge_period_ticks, max_discharge_period_ticks, max_table_ticks);
 
 
@@ -236,7 +236,7 @@ void adc_pot_task(chanend c_adc, port p_adc[], size_t num_adc){
                 }
                 int t0, t1;
                 tmr_charge :> t0; 
-                uint16_t result = lookup(init_port_val, conversion_time, cal_up, cal_down, NUM_CAL, port_time_offset);
+                uint16_t result = lookup(init_port_val, conversion_time, cal_up, cal_down, LOOKUP_SIZE, port_time_offset);
                 uint16_t post_proc_result = post_process_result(result, (uint16_t *)conversion_history, hysteris_tracker, adc_idx, num_adc);
                 results[adc_idx] = post_proc_result;
                 tmr_charge :> t1; 
