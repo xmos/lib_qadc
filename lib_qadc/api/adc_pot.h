@@ -71,6 +71,8 @@ typedef struct adc_pot_state_t{
 #define ADC_CMD_CAL_MODE_START      0x02000000ULL
 #define ADC_CMD_CAL_MODE_FINISH     0x03000000ULL
 #define ADC_CMD_POT_GET_DIR         0x03000000ULL
+#define ADC_CMD_POT_STOP_CONV       0x04000000ULL
+#define ADC_CMD_POT_START_CONV      0x05000000ULL
 #define ADC_CMD_MASK                0xff000000ULL
 
 #ifdef __XC__

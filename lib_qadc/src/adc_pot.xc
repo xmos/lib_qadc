@@ -17,6 +17,7 @@
 #define dprintf(...) 
 
 typedef enum adc_state_t{
+        ADC_STOPPED = 3,
         ADC_IDLE = 2,
         ADC_CHARGING = 1,
         ADC_CONVERTING = 0 // Optimisation as ISA can do != 0 on select guard
@@ -110,7 +111,7 @@ void gen_lookup(uint16_t * unsafe up, uint16_t * unsafe down, unsigned num_point
         unsigned t_down_ticks = (unsigned)(t_down * XS1_TIMER_HZ);
         unsigned t_up_ticks = (unsigned)(t_up * XS1_TIMER_HZ);
 
-        dprintf("i: %u r_parallel: %f v_pot: %f t_down: %u t_up: %u\n", i, r_parallel, v_pot, t_down_ticks, t_up_ticks);
+        printf("i: %u r_parallel: %f v_pot: %f t_down: %u t_up: %u\n", i, r_parallel, v_pot, t_down_ticks, t_up_ticks);
 
         if(v_pot > v_thresh){
             up[i] = t_up_ticks;
@@ -188,14 +189,14 @@ void adc_pot_init(size_t num_adc, size_t lut_size, size_t filter_depth, unsigned
     uint16_t * unsafe ptr = state_buffer;
     adc_pot_state.results = ptr;
     ptr += num_adc;
-    adc_pot_state.cal_up = ptr;
-    ptr += lut_size;
-    adc_pot_state.cal_down = ptr;
-    ptr += lut_size;
     adc_pot_state.conversion_history = ptr;
     ptr += filter_depth * num_adc;
     adc_pot_state.hysteris_tracker = ptr;
     ptr += num_adc;
+    adc_pot_state.cal_up = ptr;
+    ptr += lut_size;
+    adc_pot_state.cal_down = ptr;
+    ptr += lut_size;
     unsigned limit = (unsigned)state_buffer + sizeof(uint16_t) * ADC_POT_STATE_SIZE(num_adc, lut_size, filter_depth);
     assert(ptr == limit);
 }
@@ -206,7 +207,6 @@ void adc_pot_task(chanend c_adc, port p_adc[], adc_pot_state_t &adc_pot_state){
   
     // Current conversion index
     unsigned adc_idx = 0;
-    uint16_t results[ADC_MAX_NUM_CHANNELS] = {0}; // The ADC read values
 
     timer tmr_charge;
     timer tmr_discharge;
@@ -228,7 +228,7 @@ void adc_pot_task(chanend c_adc, port p_adc[], adc_pot_state_t &adc_pot_state){
     const float v_rail = adc_pot_state.adc_config.v_rail;
     const float v_thresh = adc_pot_state.adc_config.v_thresh;
 
-    const unsigned port_time_offset = 30; // How long approx minimum time to trigger port select. Not too critcial a parameter.
+    const unsigned port_time_offset = 32; // How long approx minimum time to trigger port select. Not too critcial a parameter.
 
     const int rc_times_to_charge_fully = 5; // 5 RC times should be sufficient to reach rail
     const uint32_t max_charge_period_ticks = ((uint64_t)rc_times_to_charge_fully * capacitor_pf * resistor_ohms / 2) / 10000;
@@ -238,7 +238,6 @@ void adc_pot_task(chanend c_adc, port p_adc[], adc_pot_state_t &adc_pot_state){
 
 
     // Generate calibration table
-
     uint32_t max_lut_ticks_up = 0, max_lut_ticks_down = 0;
     gen_lookup(adc_pot_state.cal_up, adc_pot_state.cal_down, adc_pot_state.lut_size,
                 (float)resistor_ohms, (float)capacitor_pf * 1e-12, (float)resistor_series_ohms,
@@ -251,10 +250,6 @@ void adc_pot_task(chanend c_adc, port p_adc[], adc_pot_state_t &adc_pot_state){
     uint32_t max_seen_ticks_up = 0;
     uint32_t max_seen_ticks_down = 0;
 
-    // Post processing variables
-    // uint16_t conversion_history[ADC_MAX_NUM_CHANNELS][RESULT_HISTORY_DEPTH] = {{0}};
-    // uint16_t hysteris_tracker[ADC_MAX_NUM_CHANNELS] = {0};
- 
     // Setup initial state
     adc_state_t adc_state = ADC_IDLE;
 
@@ -271,7 +266,6 @@ void adc_pot_task(chanend c_adc, port p_adc[], adc_pot_state_t &adc_pot_state){
 
     int32_t max_ticks_expected = 0;
 
-    printstrln("adc_task");
     while(1){
         select{
             case adc_state == ADC_IDLE => tmr_charge when timerafter(time_trigger_charge) :> int _:
@@ -322,7 +316,7 @@ void adc_pot_task(chanend c_adc, port p_adc[], adc_pot_state_t &adc_pot_state){
                 // Turn time into ADC setting
                 uint16_t result = lookup(init_port_val[adc_idx], conversion_time, adc_pot_state.cal_up, adc_pot_state.cal_down, adc_pot_state.lut_size, port_time_offset);
                 uint16_t post_proc_result = post_process_result(result, adc_pot_state.conversion_history, adc_pot_state.hysteris_tracker, adc_idx, adc_pot_state.num_adc, adc_pot_state.filter_depth, adc_pot_state.lut_size, adc_pot_state.result_hysteresis);
-                results[adc_idx] = post_proc_result;
+                unsafe{adc_pot_state.results[adc_idx] = post_proc_result;}
                 tmr_charge :> t1; 
                 dprintf("result: %u post_proc: %u ticks: %u is_up: %d proc_ticks: %d mu: %lu md: %lu\n", result, post_proc_result, conversion_time, init_port_val[adc_idx], t1-t0, max_seen_ticks_up, max_seen_ticks_down);
 
@@ -347,7 +341,7 @@ void adc_pot_task(chanend c_adc, port p_adc[], adc_pot_state_t &adc_pot_state){
 
                 uint16_t result = overshoot_idx + (init_port_val[adc_idx] != 0 ? 1 : 0);
                 uint16_t post_proc_result = post_process_result(result, adc_pot_state.conversion_history, adc_pot_state.hysteris_tracker, adc_idx, adc_pot_state.num_adc, adc_pot_state.filter_depth, adc_pot_state.lut_size, adc_pot_state.result_hysteresis);
-                results[adc_idx] = post_proc_result;
+                unsafe{adc_pot_state.results[adc_idx] = post_proc_result;}
 
                 dprintf("result: %u overshoot (ticks>%d) val:%u\n", result, time_trigger_overshoot-time_trigger_discharge, overshoot_port_val);
 
@@ -366,15 +360,29 @@ void adc_pot_task(chanend c_adc, port p_adc[], adc_pot_state_t &adc_pot_state){
             break;
 
             // Handle comms. Only do in charging phase which is quite a long period and non critical
-            case adc_state == ADC_CHARGING => c_adc :> uint32_t command:
+            case adc_state == ADC_CHARGING  || adc_state == ADC_STOPPED => c_adc :> uint32_t command:
                 switch(command & ADC_CMD_MASK){
                     case ADC_CMD_READ:
                         uint32_t ch = command & (~ADC_CMD_MASK);
-                        c_adc <: (uint32_t)results[ch];
+                        unsafe{c_adc <: (uint32_t)adc_pot_state.results[adc_idx];}
                     break;
                     case ADC_CMD_POT_GET_DIR:
                         uint32_t ch = command & (~ADC_CMD_MASK);
                         c_adc <: (uint32_t)init_port_val[ch];
+                    break;
+                    case ADC_CMD_POT_STOP_CONV:
+                        for(int i = 0; i < adc_pot_state.num_adc; i++){
+                            p_adc[adc_idx] :> int _;
+                        }
+                        adc_state = ADC_STOPPED;
+                    break;
+                    case ADC_CMD_POT_START_CONV:
+                        tmr_charge :> time_trigger_charge;
+                        time_trigger_charge += max_charge_period_ticks; // start in one conversion period
+                        // Clear all history
+                        memset(adc_pot_state.results, 0, adc_pot_state.cal_up - adc_pot_state.results);
+                        printstrln("restart");
+                        adc_state = ADC_IDLE;
                     break;
                     default:
                         assert(0);

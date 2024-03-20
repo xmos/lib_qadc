@@ -10,14 +10,20 @@
 #define NUM_ADC         1
 #define LUT_SIZE        1024
 #define FILTER_DEPTH    32
+#define HYSTERESIS      1
 
 on tile[0]: port p_adc[] = {XS1_PORT_1A, XS1_PORT_1D}; // Sets which pins are to be used (channels 0..n)  // X0D00, 11;
 
 
 void control_task(chanend c_adc){
+    unsigned counter = 0;
+
     while(1){
         uint32_t adc[NUM_ADC];
         uint32_t adc_dir[NUM_ADC];
+
+        // while(1);
+
         for(unsigned ch = 0; ch < NUM_ADC; ch++){
             c_adc <: (uint32_t)ADC_CMD_READ | ch;
             c_adc :> adc[ch];
@@ -25,7 +31,17 @@ void control_task(chanend c_adc){
             c_adc :> adc_dir[ch];
 
             printf("Read channel %u: %u (%u)\n", ch, adc[ch], adc_dir[ch]);
-            delay_milliseconds(1000);
+            delay_milliseconds(100);
+
+            if(counter++ == 10){
+                printf("Restarting ADC...\n");
+                c_adc <: (uint32_t)ADC_CMD_POT_STOP_CONV;
+                delay_milliseconds(1000);
+                c_adc <: (uint32_t)ADC_CMD_POT_START_CONV;
+                counter = 0;
+                delay_milliseconds(100);
+            }
+
         }
     }
 }
@@ -46,7 +62,7 @@ int main() {
     adc_pot_state_t adc_pot_state;
 
     uint16_t state_buffer[ADC_POT_STATE_SIZE(NUM_ADC, LUT_SIZE, FILTER_DEPTH)];
-    adc_pot_init(NUM_ADC, LUT_SIZE, FILTER_DEPTH, RESULT_HYSTERESIS, state_buffer, adc_config, adc_pot_state);
+    adc_pot_init(NUM_ADC, LUT_SIZE, FILTER_DEPTH, HYSTERESIS, state_buffer, adc_config, adc_pot_state);
     par
     {
         adc_pot_task(c_adc, p_adc, adc_pot_state);
