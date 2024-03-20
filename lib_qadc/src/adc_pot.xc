@@ -24,19 +24,23 @@ typedef enum adc_state_t{
 
 
 static inline uint16_t post_process_result( uint16_t raw_result,
-                                            uint16_t *conversion_history,
-                                            uint16_t *hysteris_tracker,
+                                            uint16_t *unsafe conversion_history,
+                                            uint16_t *unsafe hysteris_tracker,
                                             unsigned adc_idx,
-                                            size_t num_adc){
+                                            size_t num_adc,
+                                            size_t result_history_depth,
+                                            size_t lookup_size,
+                                            unsigned result_hysteresis){
+    unsafe{
 
     static unsigned filter_write_idx = 0;
     static unsigned filter_stable = 0;
 
     // Apply filter. First populate filter history.
-    unsigned offset = adc_idx * RESULT_HISTORY_DEPTH + filter_write_idx;
+    unsigned offset = adc_idx * result_history_depth + filter_write_idx;
     *(conversion_history + offset) = raw_result;
     if(adc_idx == num_adc - 1){
-        if(++filter_write_idx == RESULT_HISTORY_DEPTH){
+        if(++filter_write_idx == result_history_depth){
             filter_write_idx = 0;
             filter_stable = 1;
         }
@@ -44,18 +48,18 @@ static inline uint16_t post_process_result( uint16_t raw_result,
 
     // Apply moving average filter
     uint32_t accum = 0;
-    uint16_t *hist_ptr = conversion_history + adc_idx * RESULT_HISTORY_DEPTH;
-    for(int i = 0; i < RESULT_HISTORY_DEPTH; i++){
+    uint16_t *unsafe hist_ptr = conversion_history + adc_idx * result_history_depth;
+    for(int i = 0; i < result_history_depth; i++){
         accum += *hist_ptr;
         hist_ptr++;
     }
-    uint16_t filtered_result = (accum / RESULT_HISTORY_DEPTH);
+    uint16_t filtered_result = (accum / result_history_depth);
 
     // Apply hysteresis
-    if(filtered_result > hysteris_tracker[adc_idx] + RESULT_HYSTERESIS || filtered_result == LOOKUP_SIZE){
+    if(filtered_result > hysteris_tracker[adc_idx] + result_hysteresis || filtered_result == (lookup_size - 1)){
         hysteris_tracker[adc_idx] = filtered_result;
     }
-    if(filtered_result < hysteris_tracker[adc_idx] - RESULT_HYSTERESIS || filtered_result == 0){
+    if(filtered_result < hysteris_tracker[adc_idx] - result_hysteresis || filtered_result == 0){
         hysteris_tracker[adc_idx] = filtered_result;
     }
 
@@ -63,16 +67,17 @@ static inline uint16_t post_process_result( uint16_t raw_result,
 
     return filtered_hysteris_result;
 }
+}
 
 
-void gen_lookup(uint16_t up[], uint16_t down[], unsigned num_points,
+void gen_lookup(uint16_t * unsafe up, uint16_t * unsafe down, unsigned num_points,
                 float r_ohms, float capacitor_f, float rs_ohms,
                 float v_rail, float v_thresh,
                 uint32_t *max_lut_ticks_up, uint32_t *max_lut_ticks_down){
     dprintf("gen_lookup\n");
     
-    memset(up, 0, num_points * sizeof(up[0]));
-    memset(down, 0, num_points * sizeof(up[0]));
+    // memset(up, 0, num_points * sizeof(up[0]));
+    // memset(down, 0, num_points * sizeof(up[0]));
 
     *max_lut_ticks_down = 0;
     *max_lut_ticks_up = 0;
@@ -82,10 +87,10 @@ void gen_lookup(uint16_t up[], uint16_t down[], unsigned num_points,
     const float phi = 1e-10;
 
     int cross_vref_idx = 0;
-    for(unsigned i = 0; i < num_points + 1; i++){
+    for(unsigned i = 0; i < num_points; i++) unsafe{
         // Calculate equivalent resistance of pot
         float r_low = r_ohms * (i + phi) / (num_points - 1);  
-        float r_high = r_ohms * ((num_points - i) + phi) / (num_points - 1);  
+        float r_high = r_ohms * ((num_points - i - 1) + phi) / (num_points - 1);  
         float r_parallel = 1 / (1 / r_low + 1 / r_high); // When reading the equivalent resistance of pot is this
 
         // Calculate equivalent resistances when charging via Rs
@@ -124,7 +129,7 @@ void gen_lookup(uint16_t up[], uint16_t down[], unsigned num_points,
     }
 }
 
-static inline unsigned lookup(int is_up, uint16_t ticks, uint16_t up[], uint16_t down[], unsigned num_points, unsigned port_time_offset){
+static inline unsigned lookup(int is_up, uint16_t ticks, uint16_t * unsafe up, uint16_t * unsafe down, unsigned num_points, unsigned port_time_offset){
     unsigned max_arg = 0;
 
     if(ticks > port_time_offset){
@@ -133,10 +138,10 @@ static inline unsigned lookup(int is_up, uint16_t ticks, uint16_t up[], uint16_t
         ticks = 0;
     }
 
-    if(is_up){
+    if(is_up) unsafe{
         uint16_t max = 0;
-        max_arg = num_points;
-        for(int i = num_points; i >= 0; i--){
+        max_arg = num_points - 1;
+        for(int i = num_points - 1; i >= 0; i--){
             if(ticks > up[i]){
                 if(up[i] > max){
                     max_arg = i - 1;
@@ -144,9 +149,9 @@ static inline unsigned lookup(int is_up, uint16_t ticks, uint16_t up[], uint16_t
                 } 
             }
         }
-    } else {
+    } else unsafe{
         int16_t max = 0;
-        for(int i = 0; i < num_points + 1; i++){
+        for(int i = 0; i < num_points; i++){
             if(ticks > down[i]){
                 if(down[i] > max){
                     max_arg = i;
@@ -160,48 +165,48 @@ static inline unsigned lookup(int is_up, uint16_t ticks, uint16_t up[], uint16_t
 }
 
 
-typedef struct adc_pot_state_t{
-    // User config
-    size_t num_adc;
-    unsigned adc_idx;
-    size_t lut_size;
-    uint16_t *results;
-    adc_pot_config_t adc_config;
 
-    // Internal state
-    uint16_t *cal_up;
-    uint16_t *cal_down;
-    uint32_t max_lut_ticks_up;
-    uint32_t max_lut_ticks_down;
-    uint32_t max_seen_ticks_up;
-    uint32_t max_seen_ticks_down;
-    q7_24_fixed_t max_scale;
-    uint32_t port_time_offset;
-    uint16_t *conversion_history;
-    uint16_t *hysteris_tracker;
+
+
+void adc_pot_init(size_t num_adc, size_t lut_size, size_t filter_depth, unsigned result_hysteresis, uint16_t *state_buffer, adc_pot_config_t adc_config, adc_pot_state_t &adc_pot_state) {
+    unsafe{
+    memset(state_buffer, 0, sizeof(uint16_t) * ADC_POT_STATE_SIZE(num_adc, lut_size, filter_depth));
+
+    adc_pot_state.num_adc = num_adc;
+    adc_pot_state.lut_size = lut_size;
+    adc_pot_state.filter_depth = filter_depth;
+    adc_pot_state.result_hysteresis = result_hysteresis;
+
+    adc_pot_state.adc_config.capacitor_pf = adc_config.capacitor_pf;
+    adc_pot_state.adc_config.resistor_ohms = adc_config.resistor_ohms;
+    adc_pot_state.adc_config.resistor_series_ohms = adc_config.resistor_series_ohms;
+    adc_pot_state.adc_config.v_rail = adc_config.v_rail;
+    adc_pot_state.adc_config.v_thresh = adc_config.v_thresh;
+
+    adc_pot_state.max_scale = 1 << Q_7_24_SHIFT;
+
+    uint16_t * unsafe ptr = state_buffer;
+    adc_pot_state.results = ptr;
+    ptr += num_adc;
+    adc_pot_state.cal_up = ptr;
+    ptr += lut_size;
+    adc_pot_state.cal_down = ptr;
+    ptr += lut_size;
+    adc_pot_state.conversion_history = ptr;
+    ptr += filter_depth * num_adc;
+    adc_pot_state.hysteris_tracker = ptr;
+    ptr += num_adc;
+    unsigned limit = (unsigned)state_buffer + sizeof(uint16_t) * ADC_POT_STATE_SIZE(num_adc, lut_size, filter_depth);
+    assert(ptr == limit);
+}
 }
 
-#define ADC_POT_STATE_SIZE(num_adc, num_adc, filter_depth)
-                            ((sizeof(uint16_t) * 2 * lut_size) +            \ /* LUT */
-                             (sizeof(uint16_t) * num_adc) +                 \ /* results */
-                             (sizeof(uint16_t) * num_adc * filter_depth) +  \ /* filter */
-                             (sizeof(uint16_t) * num_adc) +                 \ /* hysteresis */
-                             (sizeof(uint32_t) * 8) +                       \ /* individual vars */
-                             0)
-
-
-
-void adc_pot_init(size_t num_adc, size_t lut_size, size_t filter_depth, uint8_t *state_buffer, adc_pot_config_t adc_config){
-
-}
-
-void adc_pot_task(chanend c_adc, port p_adc[]){
+void adc_pot_task(chanend c_adc, port p_adc[], adc_pot_state_t &adc_pot_state){
     dprintf("adc_pot_task\n");
   
     // Current conversion index
     unsigned adc_idx = 0;
     uint16_t results[ADC_MAX_NUM_CHANNELS] = {0}; // The ADC read values
-    q7_24_fixed_t max_scale = 1 << Q_7_24_SHIFT;
 
     timer tmr_charge;
     timer tmr_discharge;
@@ -209,19 +214,19 @@ void adc_pot_task(chanend c_adc, port p_adc[]){
 
     // Set all ports to input and set drive strength
     const int port_drive = DRIVE_4MA;
-    for(int i = 0; i < num_adc; i++){
+    for(int i = 0; i < adc_pot_state.num_adc; i++){
         unsigned dummy;
         p_adc[i] :> dummy;
         set_pad_properties(p_adc[i], port_drive, PULL_NONE, 0, 0);
 
     }
 
-    const unsigned capacitor_pf = adc_config.capacitor_pf;
-    const unsigned resistor_ohms = adc_config.resistor_ohms;
-    const unsigned resistor_series_ohms = adc_config.resistor_series_ohms;
+    const unsigned capacitor_pf = adc_pot_state.adc_config.capacitor_pf;
+    const unsigned resistor_ohms = adc_pot_state.adc_config.resistor_ohms;
+    const unsigned resistor_series_ohms = adc_pot_state.adc_config.resistor_series_ohms;
 
-    const float v_rail = adc_config.v_rail;
-    const float v_thresh = adc_config.v_thresh;
+    const float v_rail = adc_pot_state.adc_config.v_rail;
+    const float v_thresh = adc_pot_state.adc_config.v_thresh;
 
     const unsigned port_time_offset = 30; // How long approx minimum time to trigger port select. Not too critcial a parameter.
 
@@ -233,14 +238,13 @@ void adc_pot_task(chanend c_adc, port p_adc[]){
 
 
     // Generate calibration table
-    uint16_t cal_up[LOOKUP_SIZE + 1] = {0};
-    uint16_t cal_down[LOOKUP_SIZE + 1] = {0};
+
     uint32_t max_lut_ticks_up = 0, max_lut_ticks_down = 0;
-    gen_lookup(cal_up, cal_down, LOOKUP_SIZE,
+    gen_lookup(adc_pot_state.cal_up, adc_pot_state.cal_down, adc_pot_state.lut_size,
                 (float)resistor_ohms, (float)capacitor_pf * 1e-12, (float)resistor_series_ohms,
                 v_rail, v_thresh,
                 &max_lut_ticks_up, &max_lut_ticks_down);
-    unsigned overshoot_idx = (unsigned)(v_thresh / v_rail * LOOKUP_SIZE);
+    unsigned overshoot_idx = (unsigned)(v_thresh / v_rail * adc_pot_state.lut_size);
     dprintf("max_charge_period_ticks: %lu max_dis_period_ticks (up/down): (%lu,%lu), overshoot_idx: %u\n", max_charge_period_ticks, max_lut_ticks_up, max_lut_ticks_down, overshoot_idx);
 
     // For auto-calibrate. TODO
@@ -248,8 +252,8 @@ void adc_pot_task(chanend c_adc, port p_adc[]){
     uint32_t max_seen_ticks_down = 0;
 
     // Post processing variables
-    uint16_t conversion_history[ADC_MAX_NUM_CHANNELS][RESULT_HISTORY_DEPTH] = {{0}};
-    uint16_t hysteris_tracker[ADC_MAX_NUM_CHANNELS] = {0};
+    // uint16_t conversion_history[ADC_MAX_NUM_CHANNELS][RESULT_HISTORY_DEPTH] = {{0}};
+    // uint16_t hysteris_tracker[ADC_MAX_NUM_CHANNELS] = {0};
  
     // Setup initial state
     adc_state_t adc_state = ADC_IDLE;
@@ -316,14 +320,14 @@ void adc_pot_task(chanend c_adc, port p_adc[]){
                 tmr_charge :> t0; 
 
                 // Turn time into ADC setting
-                uint16_t result = lookup(init_port_val[adc_idx], conversion_time, cal_up, cal_down, LOOKUP_SIZE, port_time_offset);
-                uint16_t post_proc_result = post_process_result(result, (uint16_t *)conversion_history, hysteris_tracker, adc_idx, num_adc);
+                uint16_t result = lookup(init_port_val[adc_idx], conversion_time, adc_pot_state.cal_up, adc_pot_state.cal_down, adc_pot_state.lut_size, port_time_offset);
+                uint16_t post_proc_result = post_process_result(result, adc_pot_state.conversion_history, adc_pot_state.hysteris_tracker, adc_idx, adc_pot_state.num_adc, adc_pot_state.filter_depth, adc_pot_state.lut_size, adc_pot_state.result_hysteresis);
                 results[adc_idx] = post_proc_result;
                 tmr_charge :> t1; 
                 dprintf("result: %u post_proc: %u ticks: %u is_up: %d proc_ticks: %d mu: %lu md: %lu\n", result, post_proc_result, conversion_time, init_port_val[adc_idx], t1-t0, max_seen_ticks_up, max_seen_ticks_down);
 
 
-                if(++adc_idx == num_adc){
+                if(++adc_idx == adc_pot_state.num_adc){
                     adc_idx = 0;
                 }
                 time_trigger_charge += ADC_READ_INTERVAL;
@@ -342,12 +346,12 @@ void adc_pot_task(chanend c_adc, port p_adc[]){
                 p_adc[adc_idx] :> overshoot_port_val; // For debug. TODO remove
 
                 uint16_t result = overshoot_idx + (init_port_val[adc_idx] != 0 ? 1 : 0);
-                uint16_t post_proc_result = post_process_result(result, (uint16_t *)conversion_history, hysteris_tracker, adc_idx, num_adc);
+                uint16_t post_proc_result = post_process_result(result, adc_pot_state.conversion_history, adc_pot_state.hysteris_tracker, adc_idx, adc_pot_state.num_adc, adc_pot_state.filter_depth, adc_pot_state.lut_size, adc_pot_state.result_hysteresis);
                 results[adc_idx] = post_proc_result;
 
                 dprintf("result: %u overshoot (ticks>%d) val:%u\n", result, time_trigger_overshoot-time_trigger_discharge, overshoot_port_val);
 
-                if(++adc_idx == num_adc){
+                if(++adc_idx == adc_pot_state.num_adc){
                     adc_idx = 0;
                 }
                 time_trigger_charge += ADC_READ_INTERVAL;

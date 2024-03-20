@@ -7,7 +7,9 @@
 
 #include "adc_pot.h"
 
-#define NUM_ADC 1
+#define NUM_ADC         1
+#define LUT_SIZE        1024
+#define FILTER_DEPTH    32
 
 on tile[0]: port p_adc[] = {XS1_PORT_1A, XS1_PORT_1D}; // Sets which pins are to be used (channels 0..n)  // X0D00, 11;
 
@@ -41,10 +43,13 @@ int main() {
     const float v_thresh = 1.14;
     
     const adc_pot_config_t adc_config = {capacitor_pf, resistor_ohms, resistor_series_ohms, v_rail, v_thresh};
+    adc_pot_state_t adc_pot_state;
 
+    uint16_t state_buffer[ADC_POT_STATE_SIZE(NUM_ADC, LUT_SIZE, FILTER_DEPTH)];
+    adc_pot_init(NUM_ADC, LUT_SIZE, FILTER_DEPTH, RESULT_HYSTERESIS, state_buffer, adc_config, adc_pot_state);
     par
     {
-        adc_pot_task(c_adc, p_adc, NUM_ADC, adc_config);
+        adc_pot_task(c_adc, p_adc, adc_pot_state);
         control_task(c_adc);
     }
     return 0;
