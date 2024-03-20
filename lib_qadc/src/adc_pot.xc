@@ -209,16 +209,16 @@ void adc_pot_task(chanend c_adc, port p_adc[], size_t num_adc, adc_pot_config_t 
     int time_trigger_overshoot = 0;
 
     int16_t start_time, end_time;
-    unsigned init_port_val = 0;
+    unsigned init_port_val[ADC_MAX_NUM_CHANNELS] = {0};
 
     printstrln("adc_task");
     while(1){
         select{
             case adc_state == ADC_IDLE => tmr_charge when timerafter(time_trigger_charge) :> int _:
-                p_adc[adc_idx] :> init_port_val;
+                p_adc[adc_idx] :> init_port_val[adc_idx];
                 time_trigger_discharge = time_trigger_charge + max_charge_period_ticks;
 
-                p_adc[adc_idx] <: init_port_val ^ 0x1; // Drive opposite to what we read to "charge"
+                p_adc[adc_idx] <: init_port_val[adc_idx] ^ 0x1; // Drive opposite to what we read to "charge"
                 adc_state = ADC_CHARGING;
             break;
 
@@ -229,18 +229,18 @@ void adc_pot_task(chanend c_adc, port p_adc[], size_t num_adc, adc_pot_config_t 
                 adc_state = ADC_CONVERTING;
             break;
 
-            case adc_state == ADC_CONVERTING => p_adc[adc_idx] when pinseq(init_port_val) :> int _ @ end_time:
+            case adc_state == ADC_CONVERTING => p_adc[adc_idx] when pinseq(init_port_val[adc_idx]) :> int _ @ end_time:
                 int32_t conversion_time = (end_time - start_time);
                 if(conversion_time < 0){
                     conversion_time += 0x10000; // Account for port timer wrapping
                 }
                 int t0, t1;
                 tmr_charge :> t0; 
-                uint16_t result = lookup(init_port_val, conversion_time, cal_up, cal_down, LOOKUP_SIZE, port_time_offset);
+                uint16_t result = lookup(init_port_val[adc_idx], conversion_time, cal_up, cal_down, LOOKUP_SIZE, port_time_offset);
                 uint16_t post_proc_result = post_process_result(result, (uint16_t *)conversion_history, hysteris_tracker, adc_idx, num_adc);
                 results[adc_idx] = post_proc_result;
                 tmr_charge :> t1; 
-                // printf("ticks: %u result: %u post_proc: %u ticks: %u is_up: %d proc_ticks: %d\n", conversion_time, result, post_proc_result, conversion_time, init_port_val, t1-t0);
+                // printf("ticks: %u result: %u post_proc: %u ticks: %u is_up: %d proc_ticks: %d\n", conversion_time, result, post_proc_result, conversion_time, init_port_val[adc_idx], t1-t0);
 
 
                 if(++adc_idx == num_adc){
@@ -262,11 +262,15 @@ void adc_pot_task(chanend c_adc, port p_adc[], size_t num_adc, adc_pot_config_t 
                 adc_state = ADC_IDLE;
             break;
 
-            case c_adc :> uint32_t command:
+            case adc_state == ADC_IDLE => c_adc :> uint32_t command:
                 switch(command & ADC_CMD_MASK){
                     case ADC_CMD_READ:
                         uint32_t ch = command & (~ADC_CMD_MASK);
                         c_adc <: (uint32_t)results[ch];
+                    break;
+                    case ADC_CMD_POT_GET_DIR:
+                        uint32_t ch = command & (~ADC_CMD_MASK);
+                        c_adc <: (uint32_t)init_port_val[ch];
                     break;
                     default:
                         assert(0);
