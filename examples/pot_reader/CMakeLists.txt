@@ -4,11 +4,13 @@ include($ENV{XMOS_CMAKE_PATH}/xcommon.cmake)
 project(padc_pot_example)
 
 set(APP_HW_TARGET XCORE-AI-EXPLORER)
-set(APP_DEPENDENT_MODULES   lib_padc)
+set(APP_DEPENDENT_MODULES   lib_qadc)
 
-set(APP_COMPILER_FLAGS  -O2
+set(APP_COMPILER_FLAGS  -Os
                         -g 
                         -report
                         )
 
+# Workaround for now until cmake xcommon supports this
+set(XMOS_SANDBOX_DIR ${CMAKE_CURRENT_LIST_DIR}/../../..)
 XMOS_REGISTER_APP()

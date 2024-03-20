@@ -7,21 +7,28 @@
 
 #include "adc_pot.h"
 
+#define NUM_ADC 1
+
 on tile[0]: port p_adc[] = {XS1_PORT_1A, XS1_PORT_1D}; // Sets which pins are to be used (channels 0..n)  // X0D00, 11;
 
 
 void control_task(chanend c_adc){
     while(1){
-        unsigned ch = 0;
-        delay_milliseconds(1000);
-        c_adc <: (uint32_t)ADC_CMD_READ | ch;
-        uint32_t adc;
-        c_adc :> adc;
-        printf("Read channel %u: %u\n", ch, adc);
+        uint32_t adc[NUM_ADC];
+        uint32_t adc_dir[NUM_ADC];
+        for(unsigned ch = 0; ch < NUM_ADC; ch++){
+            c_adc <: (uint32_t)ADC_CMD_READ | ch;
+            c_adc :> adc[ch];
+            c_adc <: (uint32_t)ADC_CMD_POT_GET_DIR | ch;
+            c_adc :> adc_dir[ch];
+
+            printf("Read channel %u: %u (%u)\n", ch, adc[ch], adc_dir[ch]);
+            delay_milliseconds(1000);
+        }
     }
 }
 
-extern float find_threshold_level(float v_rail, port p);
+// extern float find_threshold_level(float v_rail, port p);
 
 int main() {
     chan c_adc;
@@ -37,8 +44,7 @@ int main() {
 
     par
     {
-        adc_pot_task(c_adc, p_adc, 1, adc_config);
-        // find_threshold_level(3.3, p_adc[1]);
+        adc_pot_task(c_adc, p_adc, NUM_ADC, adc_config);
         control_task(c_adc);
     }
     return 0;
