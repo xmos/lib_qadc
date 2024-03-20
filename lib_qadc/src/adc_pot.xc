@@ -4,6 +4,7 @@
 #include <assert.h>
 #include <math.h>
 #include <stdint.h>
+#include <string.h>
 
 #include <xs1.h>
 #include <platform.h>
@@ -12,7 +13,8 @@
 #include "adc_pot.h"
 #include "adc_utils.h"
 
-#define debprintf(...) printf(...) 
+// #define dprintf(...) printf(__VA_ARGS__) 
+#define dprintf(...) 
 
 typedef enum adc_state_t{
         ADC_IDLE = 2,
@@ -63,14 +65,23 @@ static inline uint16_t post_process_result( uint16_t raw_result,
 }
 
 
-unsigned gen_lookup(uint16_t up[], uint16_t down[], unsigned num_points,
-                    float r_ohms, float capacitor_f, float rs_ohms,
-                    float v_rail, float v_thresh){
-    printf("gen_lookup\n");
-    unsigned max_ticks = 0;
+void gen_lookup(uint16_t up[], uint16_t down[], unsigned num_points,
+                float r_ohms, float capacitor_f, float rs_ohms,
+                float v_rail, float v_thresh,
+                uint32_t *max_lut_ticks_up, uint32_t *max_lut_ticks_down){
+    dprintf("gen_lookup\n");
+    
+    memset(up, 0, num_points * sizeof(up[0]));
+    memset(down, 0, num_points * sizeof(up[0]));
+
+    *max_lut_ticks_down = 0;
+    *max_lut_ticks_up = 0;
+
     //TODO rs_ohms
-    printf("r_ohms: %f capacitor_f: %f v_rail: %f v_thresh: %f\n", r_ohms, capacitor_f * 1e12, v_rail, v_thresh);
+    dprintf("r_ohms: %f capacitor_f: %f v_rail: %f v_thresh: %f\n", r_ohms, capacitor_f * 1e12, v_rail, v_thresh);
     const float phi = 1e-10;
+
+    int cross_vref_idx = 0;
     for(unsigned i = 0; i < num_points + 1; i++){
         // Calculate equivalent resistance of pot
         float r_low = r_ohms * (i + phi) / (num_points - 1);  
@@ -94,17 +105,23 @@ unsigned gen_lookup(uint16_t up[], uint16_t down[], unsigned num_points,
         unsigned t_down_ticks = (unsigned)(t_down * XS1_TIMER_HZ);
         unsigned t_up_ticks = (unsigned)(t_up * XS1_TIMER_HZ);
 
-        printf("i: %u r_parallel: %f t_down: %u t_up: %u\n", i, r_parallel, t_down_ticks, t_up_ticks);
+        dprintf("i: %u r_parallel: %f v_pot: %f t_down: %u t_up: %u\n", i, r_parallel, v_pot, t_down_ticks, t_up_ticks);
 
-        up[i] = t_up_ticks;
-        down[i] = t_down_ticks;
-        max_ticks = up[i] > max_ticks ? up[i] : max_ticks;
-        max_ticks = down[i] > max_ticks ? down[i] : max_ticks;
+        if(v_pot > v_thresh){
+            up[i] = t_up_ticks;
+            *max_lut_ticks_up = up[i] > *max_lut_ticks_up ? up[i] : *max_lut_ticks_up;
+            if(cross_vref_idx == 0){
+                cross_vref_idx = i;
+                dprintf("cross_vref_idx: %u\n", i);
+            }
+        } else {
+            down[i] = t_down_ticks;
+            *max_lut_ticks_down = down[i] > *max_lut_ticks_down ? down[i] : *max_lut_ticks_down;
+        }
 
-        assert(max_ticks < 65536); // We have a 16b port timer, so if max is more than this, then we need to slow clock or lower RC
+        assert(*max_lut_ticks_up < 65536); // We have a 16b port timer, so if max is more than this, then we need to slow clock or lower RC
+        assert(*max_lut_ticks_down < 65536); // We have a 16b port timer, so if max is more than this, then we need to slow clock or lower RC
     }
-
-    return max_ticks;
 }
 
 static inline unsigned lookup(int is_up, uint16_t ticks, uint16_t up[], uint16_t down[], unsigned num_points, unsigned port_time_offset){
@@ -143,12 +160,48 @@ static inline unsigned lookup(int is_up, uint16_t ticks, uint16_t up[], uint16_t
 }
 
 
-void adc_pot_task(chanend c_adc, port p_adc[], size_t num_adc, adc_pot_config_t adc_config){
-    printf("adc_pot_task\n");
+typedef struct adc_pot_state_t{
+    // User config
+    size_t num_adc;
+    unsigned adc_idx;
+    size_t lut_size;
+    uint16_t *results;
+    adc_pot_config_t adc_config;
+
+    // Internal state
+    uint16_t *cal_up;
+    uint16_t *cal_down;
+    uint32_t max_lut_ticks_up;
+    uint32_t max_lut_ticks_down;
+    uint32_t max_seen_ticks_up;
+    uint32_t max_seen_ticks_down;
+    q7_24_fixed_t max_scale;
+    uint32_t port_time_offset;
+    uint16_t *conversion_history;
+    uint16_t *hysteris_tracker;
+}
+
+#define ADC_POT_STATE_SIZE(num_adc, num_adc, filter_depth)
+                            ((sizeof(uint16_t) * 2 * lut_size) +            \ /* LUT */
+                             (sizeof(uint16_t) * num_adc) +                 \ /* results */
+                             (sizeof(uint16_t) * num_adc * filter_depth) +  \ /* filter */
+                             (sizeof(uint16_t) * num_adc) +                 \ /* hysteresis */
+                             (sizeof(uint32_t) * 8) +                       \ /* individual vars */
+                             0)
+
+
+
+void adc_pot_init(size_t num_adc, size_t lut_size, size_t filter_depth, uint8_t *state_buffer, adc_pot_config_t adc_config){
+
+}
+
+void adc_pot_task(chanend c_adc, port p_adc[]){
+    dprintf("adc_pot_task\n");
   
     // Current conversion index
     unsigned adc_idx = 0;
     uint16_t results[ADC_MAX_NUM_CHANNELS] = {0}; // The ADC read values
+    q7_24_fixed_t max_scale = 1 << Q_7_24_SHIFT;
 
     timer tmr_charge;
     timer tmr_discharge;
@@ -172,11 +225,8 @@ void adc_pot_task(chanend c_adc, port p_adc[], size_t num_adc, adc_pot_config_t 
 
     const unsigned port_time_offset = 30; // How long approx minimum time to trigger port select. Not too critcial a parameter.
 
-    const int rc_times_to_charge_fully = 10; // 5 RC times should be sufficient but double it for best accuracy
+    const int rc_times_to_charge_fully = 5; // 5 RC times should be sufficient to reach rail
     const uint32_t max_charge_period_ticks = ((uint64_t)rc_times_to_charge_fully * capacitor_pf * resistor_ohms / 2) / 10000;
-
-    const int num_time_constants_disch_max = 3;
-    const uint32_t max_discharge_period_ticks = ((uint64_t)capacitor_pf * num_time_constants_disch_max * resistor_ohms / 2) / 10000;
 
     // assert(ADC_READ_INTERVAL > max_charge_period_ticks + max_discharge_period_ticks * 2); // Ensure conversion rate is low enough. *2 to allow post processing time
     // printintln(ADC_READ_INTERVAL); printintln(max_charge_period_ticks +max_discharge_period_ticks);
@@ -185,31 +235,37 @@ void adc_pot_task(chanend c_adc, port p_adc[], size_t num_adc, adc_pot_config_t 
     // Generate calibration table
     uint16_t cal_up[LOOKUP_SIZE + 1] = {0};
     uint16_t cal_down[LOOKUP_SIZE + 1] = {0};
-    uint16_t max_table_ticks = gen_lookup(cal_up, cal_down, LOOKUP_SIZE,
-                                        (float)resistor_ohms, (float)capacitor_pf * 1e-12, (float)resistor_series_ohms,
-                                        v_rail, v_thresh);
+    uint32_t max_lut_ticks_up = 0, max_lut_ticks_down = 0;
+    gen_lookup(cal_up, cal_down, LOOKUP_SIZE,
+                (float)resistor_ohms, (float)capacitor_pf * 1e-12, (float)resistor_series_ohms,
+                v_rail, v_thresh,
+                &max_lut_ticks_up, &max_lut_ticks_down);
     unsigned overshoot_idx = (unsigned)(v_thresh / v_rail * LOOKUP_SIZE);
-    printf("max_charge_period_ticks: %lu max_discharge_period_ticks: %lu max_table_ticks: %u\n", max_charge_period_ticks, max_discharge_period_ticks, max_table_ticks);
+    dprintf("max_charge_period_ticks: %lu max_dis_period_ticks (up/down): (%lu,%lu), overshoot_idx: %u\n", max_charge_period_ticks, max_lut_ticks_up, max_lut_ticks_down, overshoot_idx);
 
+    // For auto-calibrate. TODO
+    uint32_t max_seen_ticks_up = 0;
+    uint32_t max_seen_ticks_down = 0;
 
     // Post processing variables
     uint16_t conversion_history[ADC_MAX_NUM_CHANNELS][RESULT_HISTORY_DEPTH] = {{0}};
     uint16_t hysteris_tracker[ADC_MAX_NUM_CHANNELS] = {0};
-
-    printuintln(sizeof(conversion_history));
  
+    // Setup initial state
     adc_state_t adc_state = ADC_IDLE;
 
     // Set init time for charge
     int time_trigger_charge = 0;
     tmr_charge :> time_trigger_charge;
-    time_trigger_charge += max_charge_period_ticks; // start in one conversion period's
+    time_trigger_charge += max_charge_period_ticks; // start in one conversion period
     
     int time_trigger_discharge = 0;
     int time_trigger_overshoot = 0;
 
     int16_t start_time, end_time;
     unsigned init_port_val[ADC_MAX_NUM_CHANNELS] = {0};
+
+    int32_t max_ticks_expected = 0;
 
     printstrln("adc_task");
     while(1){
@@ -219,12 +275,16 @@ void adc_pot_task(chanend c_adc, port p_adc[], size_t num_adc, adc_pot_config_t 
                 time_trigger_discharge = time_trigger_charge + max_charge_period_ticks;
 
                 p_adc[adc_idx] <: init_port_val[adc_idx] ^ 0x1; // Drive opposite to what we read to "charge"
+                max_ticks_expected = init_port_val[adc_idx] != 0 ? (int32_t)max_lut_ticks_up : (int32_t)max_lut_ticks_down;
+
                 adc_state = ADC_CHARGING;
             break;
 
             case adc_state == ADC_CHARGING => tmr_discharge when timerafter(time_trigger_discharge) :> int _:
-                p_adc[adc_idx] :> int _ @ start_time; // Make Hi Z and grab time
-                time_trigger_overshoot = time_trigger_discharge + max_discharge_period_ticks;
+                p_adc[adc_idx] :> int _ @ start_time; // Make Hi Z and grab port time
+                // Set up an event to handle if port doesn't reach oppositie value. Set at double the max expected time. This is a fairly fatal 
+                // event which is caused by mismatch of hardware vs init params
+                time_trigger_overshoot = time_trigger_discharge + (max_ticks_expected * 2);
 
                 adc_state = ADC_CONVERTING;
             break;
@@ -234,35 +294,75 @@ void adc_pot_task(chanend c_adc, port p_adc[], size_t num_adc, adc_pot_config_t 
                 if(conversion_time < 0){
                     conversion_time += 0x10000; // Account for port timer wrapping
                 }
+
+
+                // Check for soft overshoot. This is when the actual RC constant is greater than expected.
+                if(conversion_time > max_ticks_expected){
+                    dprintf("soft overshoot: %d (%d)\n", conversion_time, max_ticks_expected);
+                }
+
+                // Update max seen values. Can help track if actual RC constant is less than expected.
+                if(init_port_val[adc_idx]){
+                    if(conversion_time > max_seen_ticks_up){
+                        max_seen_ticks_up = conversion_time;
+                    }
+                } else {
+                    if(conversion_time > max_seen_ticks_down){
+                        max_seen_ticks_down = conversion_time;
+                    }
+                }
+                
                 int t0, t1;
                 tmr_charge :> t0; 
+
+                // Turn time into ADC setting
                 uint16_t result = lookup(init_port_val[adc_idx], conversion_time, cal_up, cal_down, LOOKUP_SIZE, port_time_offset);
                 uint16_t post_proc_result = post_process_result(result, (uint16_t *)conversion_history, hysteris_tracker, adc_idx, num_adc);
                 results[adc_idx] = post_proc_result;
                 tmr_charge :> t1; 
-                // printf("ticks: %u result: %u post_proc: %u ticks: %u is_up: %d proc_ticks: %d\n", conversion_time, result, post_proc_result, conversion_time, init_port_val[adc_idx], t1-t0);
+                dprintf("result: %u post_proc: %u ticks: %u is_up: %d proc_ticks: %d mu: %lu md: %lu\n", result, post_proc_result, conversion_time, init_port_val[adc_idx], t1-t0, max_seen_ticks_up, max_seen_ticks_down);
 
 
                 if(++adc_idx == num_adc){
                     adc_idx = 0;
                 }
                 time_trigger_charge += ADC_READ_INTERVAL;
+                int32_t time_now;
+                tmr_charge :> time_now;
+                if(timeafter(time_now, time_trigger_charge)){
+                    dprintf("Error - Conversion time to short\n");
+                }
 
                 adc_state = ADC_IDLE;
             break;
 
+            // This case happens if the hardware RC constant is much higher than expected
             case adc_state == ADC_CONVERTING => tmr_overshoot when timerafter(time_trigger_overshoot) :> int _:
-                p_adc[adc_idx] :> int _ @ end_time;
-                printf("result: %u overshoot\n", overshoot_idx);
+                unsigned overshoot_port_val = 0;
+                p_adc[adc_idx] :> overshoot_port_val; // For debug. TODO remove
+
+                uint16_t result = overshoot_idx + (init_port_val[adc_idx] != 0 ? 1 : 0);
+                uint16_t post_proc_result = post_process_result(result, (uint16_t *)conversion_history, hysteris_tracker, adc_idx, num_adc);
+                results[adc_idx] = post_proc_result;
+
+                dprintf("result: %u overshoot (ticks>%d) val:%u\n", result, time_trigger_overshoot-time_trigger_discharge, overshoot_port_val);
+
                 if(++adc_idx == num_adc){
                     adc_idx = 0;
                 }
                 time_trigger_charge += ADC_READ_INTERVAL;
 
+                int32_t time_now;
+                tmr_charge :> time_now;
+                if(timeafter(time_now, time_trigger_charge)){
+                    printstr("Error - ADC Conversion time to short\n");
+                }
+
                 adc_state = ADC_IDLE;
             break;
 
-            case adc_state == ADC_IDLE => c_adc :> uint32_t command:
+            // Handle comms. Only do in charging phase which is quite a long period and non critical
+            case adc_state == ADC_CHARGING => c_adc :> uint32_t command:
                 switch(command & ADC_CMD_MASK){
                     case ADC_CMD_READ:
                         uint32_t ch = command & (~ADC_CMD_MASK);

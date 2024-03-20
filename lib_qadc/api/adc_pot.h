@@ -22,6 +22,9 @@ typedef struct adc_pot_config_t{
     float v_thresh;
 }adc_pot_config_t;
 
+typedef int32_t q7_24_fixed_t;
+#define Q_7_24_SHIFT    24
+
 
 // ADC operation
 #define ADC_READ_INTERVAL           (1 * XS1_TIMER_KHZ)   // Time in between individual conversions 1ms with 10nf / 10k is practical minimum
