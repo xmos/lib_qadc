@@ -1,2 +1,2 @@
-# lib_padc
-Psuedo ADC for reading variable resistors using GPIO
+# lib_qadc
+Quasi ADC for reading variable resistors using GPIO
