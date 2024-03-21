@@ -54,9 +54,9 @@ typedef struct adc_pot_state_t{
 
 #define ADC_POT_STATE_SIZE(num_adc, lut_size, filter_depth)              (( \
                              (sizeof(uint16_t) * num_adc) +                 \
-                             (sizeof(uint16_t) * 2 * lut_size) +            \
                              (sizeof(uint16_t) * num_adc * filter_depth) +  \
                              (sizeof(uint16_t) * num_adc) +                 \
+                             (sizeof(uint16_t) * 2 * lut_size) +            \
                              (sizeof(uint16_t) - 1)) / sizeof(uint16_t))
 
 
@@ -70,9 +70,10 @@ typedef struct adc_pot_state_t{
 #define ADC_CMD_READ                0x01000000ULL         
 #define ADC_CMD_CAL_MODE_START      0x02000000ULL
 #define ADC_CMD_CAL_MODE_FINISH     0x03000000ULL
-#define ADC_CMD_POT_GET_DIR         0x03000000ULL
-#define ADC_CMD_POT_STOP_CONV       0x04000000ULL
-#define ADC_CMD_POT_START_CONV      0x05000000ULL
+#define ADC_CMD_POT_GET_DIR         0x04000000ULL
+#define ADC_CMD_POT_STOP_CONV       0x05000000ULL
+#define ADC_CMD_POT_START_CONV      0x06000000ULL
+#define ADC_CMD_POT_EXIT            0x07000000ULL
 #define ADC_CMD_MASK                0xff000000ULL
 
 #ifdef __XC__

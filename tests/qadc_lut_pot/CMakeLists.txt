@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.21)
 include($ENV{XMOS_CMAKE_PATH}/xcommon.cmake)
 
-project(qadc_pot_example)
+project(qadc_pot_lut)
 
 set(APP_HW_TARGET XCORE-AI-EXPLORER)
 set(APP_DEPENDENT_MODULES   lib_qadc)
@@ -9,6 +9,7 @@ set(APP_DEPENDENT_MODULES   lib_qadc)
 set(APP_COMPILER_FLAGS  -Os
                         -g 
                         -report
+                        -fcmdline-buffer-bytes=2048
                         )
 
 # Workaround for now until cmake xcommon supports this

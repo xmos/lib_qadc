@@ -4,35 +4,74 @@
 import os
 import tempfile
 from pathlib import Path
-
-import xscope_fileio
+import subprocess
+import numpy as np
+import sys
 
 file_dir = Path(__file__).parent.absolute()
 root_dir = Path(__file__).parent.parent.absolute()
-ref_text = b"Evolution is change in the heritable characteristics of biological populations over successive generations.\x00"
-ref_mod_text = ref_text[0:10] + b"IS" + ref_text[12:]
 
-def test_run_features():
-    tmpdir = Path(tempfile.mkdtemp(prefix='tmp_throughput_', dir=file_dir))
-    os.chdir(tmpdir) # so that the firmware can find the files
+sys.path.append(str(root_dir/"design"))
+import qadc_model
 
-    with open(tmpdir/"features_ref.bin", "wb") as ref_file:
-        ref_file.write(ref_text)
 
-    firmware_xe = root_dir/"examples"/"fileio_features_xc"/"bin"/"fileio_features_xc.xe"
+def test_lut(cap_pf, res_pot, res_ser, vrail, vthresh, num_adc, filter_depth, lut_size, hysteresis):
+    firmware_xe = root_dir/"tests"/"qadc_lut_pot"/"bin"/"qadc_pot_lut.xe"
+    lut_file = file_dir/"pot_lut.bin"
+
     print(f"Firmware: {firmware_xe}")
-    print(f"Adapter_id: None")
 
-    xscope_fileio.run_on_target(None, firmware_xe, use_xsim=True)
-    with open(tmpdir/"features_dut.bin", "rb") as dut_file:
-        dut_text = dut_file.read()
-    with open(tmpdir/"features_dut_mod.bin", "rb") as dut_mod_file:
-        dut_mod_text = dut_mod_file.read()
+    # Create header file for filter sizing etc.
+    with open(str(file_dir/"qadc_lut_pot/src/filter_settings.h"), "wt") as incl:
+        text = f"#define NUM_ADC         {num_adc}\n"
+        text+= f"#define LUT_SIZE        {lut_size}\n"
+        text+= f"#define FILTER_DEPTH    {filter_depth}\n"
+        text+= f"#define HYSTERESIS      {hysteresis}\n"
+        incl.write(text)
 
-    assert dut_text == ref_text, "ERROR: features test failed (dut_text)"
-    assert dut_mod_text == ref_mod_text, "ERROR: features test failed (dut_mod_text)"
+    # Build test app
+    cmd = 'cmake -G "Unix Makefiles" -B build'
+    subprocess.run(cmd, shell=True, cwd=str(file_dir/"qadc_lut_pot"))
+    cmd = 'xmake -j'
+    subprocess.run(cmd, shell=True, cwd=str(file_dir/"qadc_lut_pot/build"))
+
+    # Run test app
+    cmd = f"xsim --args {firmware_xe} {cap_pf} {res_pot} {res_ser} {vrail} {vthresh}"
+    # if True:
+    if not os.path.isfile(lut_file):
+        subprocess.run(cmd.split())
+
+    # Load output
+    lut_dut = np.fromfile(lut_file, dtype=np.uint16)
+
+    # Extract LUT
+    offset = num_adc + num_adc * filter_depth + num_adc
+    lut_dut_up = lut_dut[offset:offset+lut_size] 
+    lut_dut_down = lut_dut[offset+lut_size:]
+
+    # Get model LUT
+    qadc = qadc_model.qadc_pot(cap_pf, res_pot, res_ser, vrail, vthresh, lut_size)
+
+    # Extract and turn into np
+    lut_model_up = np.array(qadc.up, dtype=np.uint16)
+    lut_model_down = np.array(qadc.down, dtype=np.uint16)
+
+    assert lut_dut_up.shape == lut_model_up.shape, "ERROR: LUTs different shapes"
+    assert lut_dut_down.shape == lut_model_down.shape, "ERROR: LUTs different shapes"
+
+    for i in range(lut_size):
+        pass
+        print(f"{i}: DUT {lut_dut_up[i]} MDL {lut_model_up[i]}, DUT {lut_dut_down[i]} MDL {lut_model_down[i]}")
+
+
+
+    # with open(tmpdir/"features_dut_mod.bin", "rb") as dut_mod_file:
+    #     dut_mod_text = dut_mod_file.read()
+
+    # assert dut_text == ref_text, "ERROR: features test failed (dut_text)"
+    # assert dut_mod_text == ref_mod_text, "ERROR: features test failed (dut_mod_text)"
     print("features test OK")
 
 
 if __name__ == "__main__":
-    test_run_features()
+    test_lut(2000, 10000, 470, 3.3, 1.5, 1, 32, 1024, 1)

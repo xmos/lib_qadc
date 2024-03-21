@@ -1,0 +1,4 @@
+Name                    | Location                                        | Branch/tag             | Changeset
+------------------------+-------------------------------------------------+------------------------+-----------------------------------------
+lib_padc                  git@github.com:xmos/lib_padc.git                  develop                  c6d9d071772f57e4f107cd01a18b837f5332eb72
+lib_qadc                  git@github.com:xmos/lib_padc.git                  develop                  c6d9d071772f57e4f107cd01a18b837f5332eb72

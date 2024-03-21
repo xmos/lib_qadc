@@ -122,11 +122,11 @@ void gen_lookup(uint16_t * unsafe up, uint16_t * unsafe down, unsigned num_point
             down[i] = t_down_ticks;
             *max_lut_ticks_down = down[i] > *max_lut_ticks_down ? down[i] : *max_lut_ticks_down;
         }
-        printf("i: %u r_parallel: %f v_pot: %f t_down: %u t_up: %u\n", i, r_parallel, v_pot, down[i] , up[i]);
+        dprintf("i: %u r_parallel: %f v_pot: %f t_down: %u t_up: %u\n", i, r_parallel, v_pot, down[i] , up[i]);
 
     }
 
-    printf("max_lut_ticks_up: %lu max_lut_ticks_down: %lu\n", *max_lut_ticks_up, *max_lut_ticks_down);
+    dprintf("max_lut_ticks_up: %lu max_lut_ticks_down: %lu\n", *max_lut_ticks_up, *max_lut_ticks_down);
 
     assert(*max_lut_ticks_up < 65536); // We have a 16b port timer, so if max is more than this, then we need to slow clock or lower RC
     assert(*max_lut_ticks_down < 65536); // We have a 16b port timer, so if max is more than this, then we need to slow clock or lower RC
@@ -205,6 +205,9 @@ void adc_pot_init(size_t num_adc, size_t lut_size, size_t filter_depth, unsigned
 }
 }
 
+unsigned int isSimulation();
+
+
 void adc_pot_task(chanend c_adc, port p_adc[], adc_pot_state_t &adc_pot_state){
     dprintf("adc_pot_task\n");
   
@@ -220,7 +223,7 @@ void adc_pot_task(chanend c_adc, port p_adc[], adc_pot_state_t &adc_pot_state){
     for(int i = 0; i < adc_pot_state.num_adc; i++){
         unsigned dummy;
         p_adc[i] :> dummy;
-        set_pad_properties(p_adc[i], port_drive, PULL_NONE, 0, 0);
+        if(!isSimulation()) set_pad_properties(p_adc[i], port_drive, PULL_NONE, 0, 0);
 
     }
 
@@ -389,6 +392,9 @@ void adc_pot_task(chanend c_adc, port p_adc[], adc_pot_state_t &adc_pot_state){
                         memset(adc_pot_state.results, 0, adc_pot_state.cal_up - adc_pot_state.results);
                         printstrln("restart");
                         adc_state = ADC_IDLE;
+                    break;
+                    case ADC_CMD_POT_EXIT:
+                        return;
                     break;
                     default:
                         assert(0);
