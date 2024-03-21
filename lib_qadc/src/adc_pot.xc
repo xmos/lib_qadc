@@ -78,7 +78,7 @@ void gen_lookup(uint16_t * unsafe up, uint16_t * unsafe down, unsigned num_point
     dprintf("gen_lookup\n");
     
     // memset(up, 0, num_points * sizeof(up[0]));
-    // memset(down, 0, num_points * sizeof(up[0]));
+    // memset(down, 0, num_points * sizeof(down[0]));
 
     *max_lut_ticks_down = 0;
     *max_lut_ticks_up = 0;
@@ -111,23 +111,25 @@ void gen_lookup(uint16_t * unsafe up, uint16_t * unsafe down, unsigned num_point
         unsigned t_down_ticks = (unsigned)(t_down * XS1_TIMER_HZ);
         unsigned t_up_ticks = (unsigned)(t_up * XS1_TIMER_HZ);
 
-        printf("i: %u r_parallel: %f v_pot: %f t_down: %u t_up: %u\n", i, r_parallel, v_pot, t_down_ticks, t_up_ticks);
-
         if(v_pot > v_thresh){
             up[i] = t_up_ticks;
             *max_lut_ticks_up = up[i] > *max_lut_ticks_up ? up[i] : *max_lut_ticks_up;
             if(cross_vref_idx == 0){
                 cross_vref_idx = i;
-                dprintf("cross_vref_idx: %u\n", i);
+                printf("cross_vref_idx: %u\n", i);
             }
         } else {
             down[i] = t_down_ticks;
             *max_lut_ticks_down = down[i] > *max_lut_ticks_down ? down[i] : *max_lut_ticks_down;
         }
+        printf("i: %u r_parallel: %f v_pot: %f t_down: %u t_up: %u\n", i, r_parallel, v_pot, down[i] , up[i]);
 
-        assert(*max_lut_ticks_up < 65536); // We have a 16b port timer, so if max is more than this, then we need to slow clock or lower RC
-        assert(*max_lut_ticks_down < 65536); // We have a 16b port timer, so if max is more than this, then we need to slow clock or lower RC
     }
+
+    printf("max_lut_ticks_up: %lu max_lut_ticks_down: %lu\n", *max_lut_ticks_up, *max_lut_ticks_down);
+
+    assert(*max_lut_ticks_up < 65536); // We have a 16b port timer, so if max is more than this, then we need to slow clock or lower RC
+    assert(*max_lut_ticks_down < 65536); // We have a 16b port timer, so if max is more than this, then we need to slow clock or lower RC
 }
 
 static inline unsigned lookup(int is_up, uint16_t ticks, uint16_t * unsafe up, uint16_t * unsafe down, unsigned num_points, unsigned port_time_offset){
@@ -177,6 +179,7 @@ void adc_pot_init(size_t num_adc, size_t lut_size, size_t filter_depth, unsigned
     adc_pot_state.lut_size = lut_size;
     adc_pot_state.filter_depth = filter_depth;
     adc_pot_state.result_hysteresis = result_hysteresis;
+    adc_pot_state.port_time_offset = 32;
 
     adc_pot_state.adc_config.capacitor_pf = adc_config.capacitor_pf;
     adc_pot_state.adc_config.resistor_ohms = adc_config.resistor_ohms;
@@ -227,8 +230,6 @@ void adc_pot_task(chanend c_adc, port p_adc[], adc_pot_state_t &adc_pot_state){
 
     const float v_rail = adc_pot_state.adc_config.v_rail;
     const float v_thresh = adc_pot_state.adc_config.v_thresh;
-
-    const unsigned port_time_offset = 32; // How long approx minimum time to trigger port select. Not too critcial a parameter.
 
     const int rc_times_to_charge_fully = 5; // 5 RC times should be sufficient to reach rail
     const uint32_t max_charge_period_ticks = ((uint64_t)rc_times_to_charge_fully * capacitor_pf * resistor_ohms / 2) / 10000;
@@ -309,12 +310,17 @@ void adc_pot_task(chanend c_adc, port p_adc[], adc_pot_state_t &adc_pot_state){
                         max_seen_ticks_down = conversion_time;
                     }
                 }
+
+                // Check for minimum setting being smaller than port time offset (sets zero and full scale). Minimum time to trigger port select. 
+                if(conversion_time < adc_pot_state.port_time_offset){
+                    dprintf("Port offset: %lu %lu\n", conversion_time, adc_pot_state.port_time_offset);
+                }
                 
                 int t0, t1;
                 tmr_charge :> t0; 
 
                 // Turn time into ADC setting
-                uint16_t result = lookup(init_port_val[adc_idx], conversion_time, adc_pot_state.cal_up, adc_pot_state.cal_down, adc_pot_state.lut_size, port_time_offset);
+                uint16_t result = lookup(init_port_val[adc_idx], conversion_time, adc_pot_state.cal_up, adc_pot_state.cal_down, adc_pot_state.lut_size, adc_pot_state.port_time_offset);
                 uint16_t post_proc_result = post_process_result(result, adc_pot_state.conversion_history, adc_pot_state.hysteris_tracker, adc_idx, adc_pot_state.num_adc, adc_pot_state.filter_depth, adc_pot_state.lut_size, adc_pot_state.result_hysteresis);
                 unsafe{adc_pot_state.results[adc_idx] = post_proc_result;}
                 tmr_charge :> t1; 

@@ -28,7 +28,7 @@ float find_threshold_level(float v_rail, clock cl_pwm, port p_adc){
 
     p_adc <: 1 @ port_time;
 
-    // We know the threshold is around 1.15V so sweep 10mV either side
+    // We know the threshold is around 1.15V so sweep 100mV either side
     uint16_t low_bound = 1.05 / 3.3 * total_period;
     uint16_t high_bound = 1.25 / 3.3 * total_period;
 

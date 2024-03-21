@@ -36,7 +36,7 @@ void control_task(chanend c_adc){
             if(counter++ == 10){
                 printf("Restarting ADC...\n");
                 c_adc <: (uint32_t)ADC_CMD_POT_STOP_CONV;
-                delay_milliseconds(1000);
+                delay_milliseconds(1000); // Time to read the actual pot voltage
                 c_adc <: (uint32_t)ADC_CMD_POT_START_CONV;
                 counter = 0;
                 delay_milliseconds(100);
@@ -51,7 +51,7 @@ void control_task(chanend c_adc){
 int main() {
     chan c_adc;
 
-    const unsigned capacitor_pf = 4000;
+    const unsigned capacitor_pf = 3500;
     const unsigned resistor_ohms = 47000; // nominal maximum value ned to end
     const unsigned resistor_series_ohms = 470;
 

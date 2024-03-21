@@ -145,8 +145,8 @@ class qadc_pot:
             t_up = 0 if logval_up <= 0 else (-r_parallel) * capacitor_f * math.log(logval_up)
 
             # Convert to 100MHz timer ticks
-            t_down_ticks = 0 if t_down < 0 else int(t_down * XS1_TIMER_HZ)
-            t_up_ticks = 0 if t_up < 0 else int(t_up * XS1_TIMER_HZ)
+            t_down_ticks = 0 if (t_down < 0 or v_pot >= v_thresh) else int(t_down * XS1_TIMER_HZ)
+            t_up_ticks = 0 if (t_up < 0 or v_pot <= v_thresh) else int(t_up * XS1_TIMER_HZ)
 
             # print(f"LUT idx: {i} r_parallel: {r_parallel:.1f} v_pot: {v_pot:.2f} v_charge_h: {v_charge_h:.2f} v_charge_l: {v_charge_l:.2f} t_down: {t_down_ticks} t_up: {t_up_ticks}")
 
@@ -172,9 +172,15 @@ class qadc_pot:
         n_lookup = model[2]
 
         if start_high:
-            idx = n_lookup - 1 - np.argmax(np.flip(up) >= ticks)
+            if ticks > np.max(np.flip(up)):
+                idx = n_lookup - 1 - np.argmax(np.flip(up))
+            else:
+                idx = n_lookup - 1 - np.argmax(np.flip(up) >= ticks)
         else:
-            idx = np.argmax(np.array(down) >= ticks)
+            if ticks > np.max(np.array(down)):
+                idx = np.argmax(np.array(down))
+            else:
+                idx = np.argmax(np.array(down) >= ticks)
 
         return idx / (n_lookup - 1)
 
@@ -250,5 +256,5 @@ def qadc_pot_test():
 
 
 if __name__ == '__main__':
-    # qadc_pot_test()
-    qadc_rheo_test()
+    qadc_pot_test()
+    # qadc_rheo_test()
