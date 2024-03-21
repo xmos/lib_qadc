@@ -95,8 +95,8 @@ void gen_lookup(uint16_t * unsafe up, uint16_t * unsafe down, unsigned num_point
         float r_parallel = 1 / (1 / r_low + 1 / r_high); // When reading the equivalent resistance of pot is this
 
         // Calculate equivalent resistances when charging via Rs
-        float rp_low = 1 / (1 / r_high + 1 / rs_ohms);
-        float rp_high = 1 / (1 / r_low + 1 / rs_ohms);
+        float rp_low = 1 / (1 / r_low + 1 / rs_ohms);
+        float rp_high = 1 / (1 / r_high + 1 / rs_ohms);
 
         // Calculate actual charge voltage of capacitor
         float v_charge_h = r_low / (r_low + rp_high) * v_rail;
@@ -122,7 +122,7 @@ void gen_lookup(uint16_t * unsafe up, uint16_t * unsafe down, unsigned num_point
             down[i] = t_down_ticks;
             *max_lut_ticks_down = down[i] > *max_lut_ticks_down ? down[i] : *max_lut_ticks_down;
         }
-        dprintf("i: %u r_parallel: %f v_pot: %f t_down: %u t_up: %u\n", i, r_parallel, v_pot, down[i] , up[i]);
+        dprintf("i: %u r_parallel: %f v_pot: %f v_charge_h: %f v_charge_l: %f t_down: %u t_up: %u\n", i, r_parallel, v_pot, v_charge_h, v_charge_l, down[i] , up[i]);
 
     }
 

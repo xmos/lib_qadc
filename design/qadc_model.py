@@ -122,11 +122,13 @@ class qadc_pot:
         down = [0] * (n_lookup)
         max_ticks = 0
 
+        print(f"capacitor_pf: {capacitor_pf} r_pot_ohms: {r_pot_ohms} rs_ohms: {rs_ohms} v_rail: {v_rail:.2f} v_thresh: {v_thresh:.2f} n_lookup: {n_lookup}")
+
         positions = range(n_lookup)
         for i in positions:
             # Calculate equivalent resistance of pot
             r_low = r_pot_ohms * (i + phi) / (n_lookup - 1)
-            r_high = r_pot_ohms * ((n_lookup - i) + phi) / (n_lookup - 1)
+            r_high = r_pot_ohms * ((n_lookup - i - 1) + phi) / (n_lookup - 1)
             r_parallel = 1 / (1 / r_low + 1 / r_high)
 
             # Calculate equivalent resistances when charging via Rs
@@ -134,8 +136,8 @@ class qadc_pot:
             rp_driving_high = 1 / (1 / r_high + 1 / rs_ohms)
 
             # Calculate actual charge voltage of capacitor when using series resistor
-            v_charge_h = r_low / (r_low + rp_driving_high) * v_rail
             v_charge_l = rp_driving_low / (rp_driving_low + r_high) * v_rail
+            v_charge_h = r_low / (r_low + rp_driving_high) * v_rail
 
             # Calculate time to for cap to reach threshold from charge volatage
             v_pot = i / (n_lookup - 1) * v_rail + phi

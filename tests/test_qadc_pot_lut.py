@@ -60,18 +60,12 @@ def test_lut(cap_pf, res_pot, res_ser, vrail, vthresh, num_adc, filter_depth, lu
     assert lut_dut_down.shape == lut_model_down.shape, "ERROR: LUTs different shapes"
 
     for i in range(lut_size):
-        pass
-        print(f"{i}: DUT {lut_dut_up[i]} MDL {lut_model_up[i]}, DUT {lut_dut_down[i]} MDL {lut_model_down[i]}")
+        assert np.isclose(lut_dut_up[i], lut_model_up[i], rtol=0.001), f"ERROR: LUTs different at index {i}"
+        assert np.isclose(lut_dut_down[i], lut_model_down[i], rtol=0.001), f"ERROR: LUTs different at index {i}"
 
 
-
-    # with open(tmpdir/"features_dut_mod.bin", "rb") as dut_mod_file:
-    #     dut_mod_text = dut_mod_file.read()
-
-    # assert dut_text == ref_text, "ERROR: features test failed (dut_text)"
-    # assert dut_mod_text == ref_mod_text, "ERROR: features test failed (dut_mod_text)"
-    print("features test OK")
+    print("LUT test OK")
 
 
 if __name__ == "__main__":
-    test_lut(2000, 10000, 470, 3.3, 1.5, 1, 32, 1024, 1)
+    test_lut(3000, 47000, 470, 3.3, 1.14, 1, 32, 1024, 1)
