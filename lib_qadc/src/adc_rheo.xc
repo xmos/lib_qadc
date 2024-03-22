@@ -150,7 +150,7 @@ void adc_rheo_task(chanend c_adc, port p_adc[], size_t num_adc, adc_pot_config_t
     }
 
     const unsigned capacitor_pf = adc_config.capacitor_pf;
-    const unsigned resistor_ohms = adc_config.resistor_ohms;
+    const unsigned potentiometer_ohms = adc_config.potentiometer_ohms;
     const unsigned resistor_series_ohms = adc_config.resistor_series_ohms;
 
     const float v_rail = adc_config.v_rail;
@@ -162,7 +162,7 @@ void adc_rheo_task(chanend c_adc, port p_adc[], size_t num_adc, adc_pot_config_t
     const uint32_t max_charge_period_ticks = ((uint64_t)rc_times_to_charge_fully * capacitor_pf * resistor_series_ohms) / 10000;
 
     const int num_time_constants_disch_max = 3;
-    const uint32_t max_discharge_period_ticks = ((uint64_t)capacitor_pf * num_time_constants_disch_max * resistor_ohms) / 10000;
+    const uint32_t max_discharge_period_ticks = ((uint64_t)capacitor_pf * num_time_constants_disch_max * potentiometer_ohms) / 10000;
 
 
     assert(ADC_READ_INTERVAL > max_charge_period_ticks + max_discharge_period_ticks * 2); // Ensure conversion rate is low enough. *2 to allow post processing time

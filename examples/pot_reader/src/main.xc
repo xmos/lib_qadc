@@ -55,13 +55,13 @@ int main() {
             chan c_adc;
 
             const unsigned capacitor_pf = 8800;
-            const unsigned resistor_ohms = 10000; // nominal maximum value ned to end
+            const unsigned potentiometer_ohms = 10000; // nominal maximum value ned to end
             const unsigned resistor_series_ohms = 220;
 
             const float v_rail = 3.3;
-            const float v_thresh = 1.16;
+            const float v_thresh = 1.15;
             
-            const adc_pot_config_t adc_config = {capacitor_pf, resistor_ohms, resistor_series_ohms, v_rail, v_thresh};
+            const adc_pot_config_t adc_config = {capacitor_pf, potentiometer_ohms, resistor_series_ohms, v_rail, v_thresh};
             adc_pot_state_t adc_pot_state;
 
             uint16_t state_buffer[ADC_POT_STATE_SIZE(NUM_ADC, LUT_SIZE, FILTER_DEPTH)];

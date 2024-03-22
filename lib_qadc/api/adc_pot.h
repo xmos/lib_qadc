@@ -16,7 +16,7 @@
 
 typedef struct adc_pot_config_t{
     unsigned capacitor_pf;
-    unsigned resistor_ohms; // nominal maximum value end to end
+    unsigned potentiometer_ohms; // nominal maximum value end to end
     unsigned resistor_series_ohms;
     float v_rail;
     float v_thresh;

@@ -40,7 +40,7 @@ void adc_pot_init(  size_t num_adc,
 
         // Copy config
         adc_pot_state.adc_config.capacitor_pf = adc_config.capacitor_pf;
-        adc_pot_state.adc_config.resistor_ohms = adc_config.resistor_ohms;
+        adc_pot_state.adc_config.potentiometer_ohms = adc_config.potentiometer_ohms;
         adc_pot_state.adc_config.resistor_series_ohms = adc_config.resistor_series_ohms;
         adc_pot_state.adc_config.v_rail = adc_config.v_rail;
         adc_pot_state.adc_config.v_thresh = adc_config.v_thresh;
@@ -76,7 +76,7 @@ void adc_pot_init(  size_t num_adc,
 
         // Generate calibration lookup table
         gen_lookup_pot( adc_pot_state.cal_up, adc_pot_state.cal_down, adc_pot_state.lut_size,
-                        (float)adc_config.resistor_ohms, (float)adc_config.capacitor_pf * 1e-12, (float)adc_config.resistor_series_ohms,
+                        (float)adc_config.potentiometer_ohms, (float)adc_config.capacitor_pf * 1e-12, (float)adc_config.resistor_series_ohms,
                         adc_config.v_rail, adc_config.v_thresh,
                         &adc_pot_state.max_lut_ticks_up, &adc_pot_state.max_lut_ticks_down);
         adc_pot_state.crossover_idx = (unsigned)(adc_config.v_thresh / adc_config.v_rail * adc_pot_state.lut_size);
@@ -198,10 +198,10 @@ void adc_pot_task(chanend c_adc, port p_adc[], adc_pot_state_t &adc_pot_state){
     }
 
     const unsigned capacitor_pf = adc_pot_state.adc_config.capacitor_pf;
-    const unsigned resistor_ohms = adc_pot_state.adc_config.resistor_ohms;
+    const unsigned potentiometer_ohms = adc_pot_state.adc_config.potentiometer_ohms;
 
     const int rc_times_to_charge_fully = 5; // 5 RC times should be sufficient to reach rail
-    const uint32_t max_charge_period_ticks = ((uint64_t)rc_times_to_charge_fully * capacitor_pf * resistor_ohms / 2) / 10000;
+    const uint32_t max_charge_period_ticks = ((uint64_t)rc_times_to_charge_fully * capacitor_pf * potentiometer_ohms / 4) / 10000;
 
     const uint32_t max_discharge_period_ticks = (adc_pot_state.max_lut_ticks_up > adc_pot_state.max_lut_ticks_down ?
                                                 adc_pot_state.max_lut_ticks_up : adc_pot_state.max_lut_ticks_down);
@@ -243,7 +243,7 @@ void adc_pot_task(chanend c_adc, port p_adc[], adc_pot_state_t &adc_pot_state){
             case adc_state == ADC_CHARGING => tmr_discharge when timerafter(time_trigger_discharge) :> int _:
                 p_adc[adc_idx] :> int _ @ start_time; // Make Hi Z and grab port time
                 // Set up an event to handle if port doesn't reach oppositie value. Set at double the max expected time. This is a fairly fatal 
-                // event which is caused by mismatch of hardware vs init params
+                // event which is caused by severe mismatch of hardware vs init params
                 time_trigger_overshoot = time_trigger_discharge + (max_ticks_expected * 2);
 
                 adc_state = ADC_CONVERTING;
@@ -256,13 +256,7 @@ void adc_pot_task(chanend c_adc, port p_adc[], adc_pot_state_t &adc_pot_state){
                         conversion_time += 0x10000; // Account for port timer wrapping
                     }
 
-
-                    // Check for soft overshoot. This is when the actual RC constant is greater than expected.
-                    if(conversion_time > max_ticks_expected){
-                        dprintf("soft overshoot: %d (%d)\n", conversion_time, max_ticks_expected);
-                    }
-
-                    // Update max seen values. Can help track if actual RC constant is less than expected.
+                    // Update max seen values. Can help tracking if actual RC constant is less than expected.
                     if(init_port_val[adc_idx]) unsafe{
                         if(conversion_time > adc_pot_state.max_seen_ticks_up[adc_idx]){
                             adc_pot_state.max_seen_ticks_up[adc_idx] = conversion_time;
@@ -273,9 +267,14 @@ void adc_pot_task(chanend c_adc, port p_adc[], adc_pot_state_t &adc_pot_state){
                         }
                     }
 
+                    // Check for soft overshoot. This is when the actual RC constant is greater than expected.
+                    if(conversion_time > max_ticks_expected){
+                        printf("soft overshoot: %d (%d)\n", conversion_time, max_ticks_expected);
+                    }
+
                     // Check for minimum setting being smaller than port time offset (sets zero and full scale). Minimum time to trigger port select. 
                     if(conversion_time < adc_pot_state.port_time_offset){
-                        dprintf("Port offset: %lu %lu\n", conversion_time, adc_pot_state.port_time_offset);
+                        printf("Port offset: %lu %lu\n", conversion_time, adc_pot_state.port_time_offset);
                     }
                     
                     int t0, t1;
@@ -335,7 +334,7 @@ void adc_pot_task(chanend c_adc, port p_adc[], adc_pot_state_t &adc_pot_state){
                 int32_t time_now;
                 tmr_charge :> time_now;
                 if(timeafter(time_now, time_trigger_charge)){
-                    printstr("Error - ADC Conversion time to short\n");
+                    printstr("Error - ADC Conversion time to short for configuration\n");
                 }
 
                 adc_state = ADC_IDLE;
