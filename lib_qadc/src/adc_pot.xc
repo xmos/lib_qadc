@@ -216,11 +216,13 @@ void adc_pot_task(chanend c_adc, port p_adc[], adc_pot_state_t &adc_pot_state){
     const uint32_t max_discharge_period_ticks = (adc_pot_state.max_lut_ticks_up > adc_pot_state.max_lut_ticks_down ?
                                                 adc_pot_state.max_lut_ticks_up : adc_pot_state.max_lut_ticks_down);
 
-    dprintf("ADC_READ_INTERVAL: %d max charge/discharge_period: %lu\n", ADC_READ_INTERVAL, max_charge_period_ticks + max_discharge_period_ticks);
+    const uint32_t convert_interval_ticks = adc_pot_state.adc_config.convert_interval_ticks;
+
+    dprintf("convert_interval_ticks: %d max charge/discharge_period: %lu\n", convert_interval_ticks, max_charge_period_ticks + max_discharge_period_ticks);
     dprintf("max_charge_period_ticks: %lu max_dis_period_ticks (up/down): (%lu,%lu), crossover_idx: %u\n",
             max_charge_period_ticks, adc_pot_state.max_lut_ticks_up, adc_pot_state.max_lut_ticks_down, adc_pot_state.crossover_idx);
 
-    assert(ADC_READ_INTERVAL > max_charge_period_ticks + max_discharge_period_ticks * 2); // Ensure conversion rate is low enough. *2 to allow post processing time
+    assert(convert_interval_ticks > max_charge_period_ticks + max_discharge_period_ticks * 2); // Ensure conversion rate is low enough. *2 to allow post processing time
 
     // Setup initial state
     adc_state_t adc_state = ADC_IDLE;
@@ -282,7 +284,7 @@ void adc_pot_task(chanend c_adc, port p_adc[], adc_pot_state_t &adc_pot_state){
 
                     // Check for soft overshoot. This is when the actual RC constant is greater than expected and is expected.
                     if(conversion_time > max_ticks_expected){
-                        printf("soft overshoot: %d (%d)\n", conversion_time, max_ticks_expected);
+                        dprintf("soft overshoot: %d (%d)\n", conversion_time, max_ticks_expected);
 
                         if(adc_pot_state.adc_config.auto_scale){
                             q3_13_fixed_t new_scale = (((uint32_t)conversion_time << 16) / max_ticks_expected) >> (16 - Q_3_13_SHIFT);
@@ -300,7 +302,7 @@ void adc_pot_task(chanend c_adc, port p_adc[], adc_pot_state_t &adc_pot_state){
 
                     // Check for minimum setting being smaller than port time offset (sets zero and full scale). Minimum time to trigger port select. 
                     if(conversion_time < adc_pot_state.port_time_offset){
-                        printf("Port offset: %lu %lu\n", conversion_time, adc_pot_state.port_time_offset);
+                        dprintf("Port offset: %lu %lu\n", conversion_time, adc_pot_state.port_time_offset);
                         if(adc_pot_state.adc_config.auto_scale){
                             adc_pot_state.port_time_offset = conversion_time;
                         }
@@ -334,7 +336,7 @@ void adc_pot_task(chanend c_adc, port p_adc[], adc_pot_state_t &adc_pot_state){
                     if(++adc_idx == adc_pot_state.num_adc){
                         adc_idx = 0;
                     }
-                    time_trigger_charge += ADC_READ_INTERVAL;
+                    time_trigger_charge += convert_interval_ticks;
                     int32_t time_now;
                     tmr_charge :> time_now;
                     if(timeafter(time_now, time_trigger_charge)){
@@ -359,7 +361,7 @@ void adc_pot_task(chanend c_adc, port p_adc[], adc_pot_state_t &adc_pot_state){
                 if(++adc_idx == adc_pot_state.num_adc){
                     adc_idx = 0;
                 }
-                time_trigger_charge += ADC_READ_INTERVAL;
+                time_trigger_charge += convert_interval_ticks;
 
                 int32_t time_now;
                 tmr_charge :> time_now;

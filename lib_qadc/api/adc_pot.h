@@ -35,7 +35,6 @@ typedef struct adc_pot_state_t{
     size_t lut_size;
     size_t filter_depth;
     unsigned result_hysteresis;
-    unsigned adc_read_interval;
     uint16_t * unsafe results;
     adc_pot_config_t adc_config;
 

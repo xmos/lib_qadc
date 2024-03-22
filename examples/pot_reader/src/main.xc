@@ -62,7 +62,7 @@ int main() {
             const float v_thresh = 1.15;
             const char auto_scale = 0;
 
-            const unsigned convert_interval_ticks = (1 * XS1_TIMER_KHZ);
+            const unsigned convert_interval_ticks = (0.5 * XS1_TIMER_KHZ);
             
             const adc_pot_config_t adc_config = {capacitor_pf,
                                                 potentiometer_ohms,
