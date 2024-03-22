@@ -22,7 +22,7 @@ void parse_cmd_line(adc_pot_config_t &adc_config, unsigned argc, char * unsafe a
             adc_config.capacitor_pf = (unsigned)(atoi((char *)argv[i]));
         }
         if(i == 2){
-            adc_config.resistor_ohms = (unsigned)(atoi((char *)argv[i]));
+            adc_config.potentiometer_ohms = (unsigned)(atoi((char *)argv[i]));
         }
         if(i == 3){
             adc_config.resistor_series_ohms = (unsigned)(atoi((char *)argv[i]));
@@ -45,6 +45,8 @@ int main(unsigned argc, char * unsafe argv[argc]){
 
     adc_pot_config_t adc_config;
     parse_cmd_line(adc_config, argc, argv);
+    adc_config.convert_interval_ticks = (1 * XS1_TIMER_KHZ);
+    adc_config.auto_scale = 0;
 
     chan c_adc;
 

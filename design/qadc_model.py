@@ -141,10 +141,12 @@ class qadc_pot:
 
             # Calculate time to for cap to reach threshold from charge volatage
             v_pot = i / (n_lookup - 1) * v_rail + phi
-            logval_down = 1 - (v_charge_h - v_thresh) / (v_rail - v_pot)
-            t_down = 0 if logval_down <= 0 else (-r_parallel) * capacitor_f * math.log(logval_down)
-            logval_up = 1 - ((v_thresh - v_charge_l) / v_pot)
+            logval_up = 1 - ((v_thresh - v_charge_l) / (v_pot - v_charge_l))
             t_up = 0 if logval_up <= 0 else (-r_parallel) * capacitor_f * math.log(logval_up)
+            v_down_offset = v_rail - v_charge_h;
+            logval_down = 1 - (v_rail - v_thresh - v_down_offset) / (v_rail - v_pot - v_down_offset)
+            t_down = 0 if logval_down <= 0 else (-r_parallel) * capacitor_f * math.log(logval_down)
+
 
             # Convert to 100MHz timer ticks
             t_down_ticks = 0 if (t_down < 0 or v_pot >= v_thresh) else int(t_down * XS1_TIMER_HZ)

@@ -61,7 +61,7 @@ void gen_lookup_pot(uint16_t * up, uint16_t * down, unsigned num_points,
             down[i] = t_down_ticks;
             *max_lut_ticks_down = down[i] > *max_lut_ticks_down ? down[i] : *max_lut_ticks_down;
         }
-        printf("i: %u r_parallel: %f v_pot: %f v_charge_h: %f v_charge_l: %f t_down: %u t_up: %u\n", i, r_parallel, v_pot, v_charge_h, v_charge_l, down[i] , up[i]);
+        dprintf("i: %u r_parallel: %f v_pot: %f v_charge_h: %f v_charge_l: %f t_down: %u t_up: %u\n", i, r_parallel, v_pot, v_charge_h, v_charge_l, down[i] , up[i]);
 
     }
 

@@ -36,7 +36,7 @@ void adc_pot_init(  size_t num_adc,
         adc_pot_state.lut_size = lut_size;
         adc_pot_state.filter_depth = filter_depth;
         adc_pot_state.result_hysteresis = result_hysteresis;
-        adc_pot_state.port_time_offset = 32;
+        adc_pot_state.port_time_offset = 32; // Tested at 120MHz thread speed
 
         // Copy config
         adc_pot_state.adc_config.capacitor_pf = adc_config.capacitor_pf;
@@ -106,10 +106,10 @@ static inline unsigned ticks_to_position(int is_up,
         ticks = 0;
     }
 
-
     if(is_up) unsafe{
         //Apply scaling (for best adjusting crossover smoothness)
-        ticks = ((int64_t)max_scale_up * (int64_t)ticks) >> Q_3_13_SHIFT;
+        ticks = (uint32_t)ticks << Q_3_13_SHIFT / max_scale_up;
+        // ticks = ((int64_t)max_scale_up * (int64_t)ticks) >> Q_3_13_SHIFT;
         
         uint16_t max = 0;
         max_arg = num_points - 1;
@@ -123,7 +123,10 @@ static inline unsigned ticks_to_position(int is_up,
         }
     } else unsafe{
         //Apply scaling (for best adjusting crossover smoothness)
-        ticks = ((int64_t)max_scale_down * (int64_t)ticks) >> Q_3_13_SHIFT;
+        // printuintln(ticks);
+        // ticks = ((int64_t)max_scale_down * (int64_t)ticks) >> Q_3_13_SHIFT;
+        ticks = (uint32_t)ticks << Q_3_13_SHIFT / max_scale_down;
+        // printuintln(ticks);
 
         int16_t max = 0;
         for(int i = 0; i < num_points; i++){
@@ -249,8 +252,9 @@ void adc_pot_task(chanend c_adc, port p_adc[], adc_pot_state_t &adc_pot_state){
                 p_adc[adc_idx] <: init_port_val[adc_idx] ^ 0x1; // Drive opposite to what we read to "charge"
                 unsafe{
                     max_ticks_expected = init_port_val[adc_idx] != 0 ? 
-                                        ((uint32_t)adc_pot_state.max_lut_ticks_up * adc_pot_state.max_scale_up[adc_idx]) >> Q_3_13_SHIFT :
-                                        ((uint32_t)adc_pot_state.max_lut_ticks_down * adc_pot_state.max_scale_down[adc_idx]) >> Q_3_13_SHIFT;}
+                                        ((uint32_t)adc_pot_state.max_lut_ticks_up * (uint32_t)adc_pot_state.max_scale_up[adc_idx]) >> Q_3_13_SHIFT :
+                                        ((uint32_t)adc_pot_state.max_lut_ticks_down * (uint32_t)adc_pot_state.max_scale_down[adc_idx]) >> Q_3_13_SHIFT;
+                }
 
                 adc_state = ADC_CHARGING;
             break;
@@ -272,6 +276,7 @@ void adc_pot_task(chanend c_adc, port p_adc[], adc_pot_state_t &adc_pot_state){
                     }
 
                     // Update max seen values. Can help tracking if actual RC constant is less than expected.
+                    // TODO add logic
                     if(init_port_val[adc_idx]) unsafe{
                         if(conversion_time > adc_pot_state.max_seen_ticks_up[adc_idx]){
                             adc_pot_state.max_seen_ticks_up[adc_idx] = conversion_time;
@@ -285,18 +290,16 @@ void adc_pot_task(chanend c_adc, port p_adc[], adc_pot_state_t &adc_pot_state){
                     // Check for soft overshoot. This is when the actual RC constant is greater than expected and is expected.
                     if(conversion_time > max_ticks_expected){
                         dprintf("soft overshoot: %d (%d)\n", conversion_time, max_ticks_expected);
-
                         if(adc_pot_state.adc_config.auto_scale){
-                            q3_13_fixed_t new_scale = (((uint32_t)conversion_time << 16) / max_ticks_expected) >> (16 - Q_3_13_SHIFT);
                             if(init_port_val[adc_idx]){ // is up
-                                printuintln(adc_pot_state.max_scale_up[adc_idx]);
+                                q3_13_fixed_t new_scale = ((uint32_t)adc_pot_state.max_scale_up[adc_idx] * (uint32_t)conversion_time) / (uint32_t)max_ticks_expected;
+                                dprintf("up scale: %d (%d)\n", adc_pot_state.max_scale_up[adc_idx], new_scale);
                                 adc_pot_state.max_scale_up[adc_idx] = new_scale;
                             } else {
-                                printuintln(adc_pot_state.max_scale_down[adc_idx]);
+                                q3_13_fixed_t new_scale = ((uint32_t)adc_pot_state.max_scale_down[adc_idx] * (uint32_t)conversion_time) / (uint32_t)max_ticks_expected;
+                                dprintf("down scale: %d (%d)\n", adc_pot_state.max_scale_down[adc_idx], new_scale);
                                 adc_pot_state.max_scale_down[adc_idx] = new_scale;
-                            }
-                            printuintln(new_scale);
-                             
+                            }                             
                         }
                     }
 
@@ -308,6 +311,7 @@ void adc_pot_task(chanend c_adc, port p_adc[], adc_pot_state_t &adc_pot_state){
                         }
                     }
                     
+                    // Keep track of timing (DEBUG only)
                     int t0, t1;
                     tmr_charge :> t0; 
 
