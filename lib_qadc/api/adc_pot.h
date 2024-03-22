@@ -20,7 +20,8 @@ typedef struct adc_pot_config_t{
     unsigned resistor_series_ohms;
     float v_rail;
     float v_thresh;
-    unsigned read_interval_ticks;
+    unsigned convert_interval_ticks;
+    char auto_scale;
 }adc_pot_config_t;
 
 typedef uint16_t         q3_13_fixed_t;
@@ -45,7 +46,8 @@ typedef struct adc_pot_state_t{
     uint32_t max_lut_ticks_down;
     uint16_t * unsafe max_seen_ticks_up;
     uint16_t * unsafe max_seen_ticks_down;
-    q3_13_fixed_t * unsafe max_scale;
+    q3_13_fixed_t * unsafe max_scale_up;
+    q3_13_fixed_t * unsafe max_scale_down;
     unsigned crossover_idx;
     uint32_t port_time_offset;
     uint16_t * unsafe conversion_history;
@@ -54,13 +56,13 @@ typedef struct adc_pot_state_t{
 
 
 
-// results, filter, hysteresis, max_ticks * 2, scale, lut * 2
+// results, filter, hysteresis, max_ticks * 2, scale * 2, lut * 2
 #define ADC_POT_STATE_SIZE(num_adc, lut_size, filter_depth)              (( \
                              (sizeof(uint16_t) * num_adc) +                 \
                              (sizeof(uint16_t) * num_adc * filter_depth) +  \
                              (sizeof(uint16_t) * num_adc) +                 \
                              (sizeof(uint16_t) * num_adc * 2) +             \
-                             (sizeof(uint16_t) * num_adc) +                 \
+                             (sizeof(uint16_t) * num_adc * 2) +             \
                              (sizeof(uint16_t) * 2 * lut_size) +            \
                              (sizeof(uint16_t) - 1)) / sizeof(uint16_t))
 

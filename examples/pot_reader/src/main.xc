@@ -36,7 +36,7 @@ void control_task(chanend c_adc){
         putchar('\n');
         delay_milliseconds(100);
 
-        if(counter++ == 10){
+        if(counter == 10){
             printf("Restarting ADC...\n");
             c_adc <: (uint32_t)ADC_CMD_POT_STOP_CONV;
             delay_milliseconds(1000); // Time to read the actual pot voltage
@@ -60,8 +60,17 @@ int main() {
 
             const float v_rail = 3.3;
             const float v_thresh = 1.15;
+            const char auto_scale = 0;
+
+            const unsigned convert_interval_ticks = (1 * XS1_TIMER_KHZ);
             
-            const adc_pot_config_t adc_config = {capacitor_pf, potentiometer_ohms, resistor_series_ohms, v_rail, v_thresh};
+            const adc_pot_config_t adc_config = {capacitor_pf,
+                                                potentiometer_ohms,
+                                                resistor_series_ohms,
+                                                v_rail,
+                                                v_thresh,
+                                                convert_interval_ticks,
+                                                auto_scale};
             adc_pot_state_t adc_pot_state;
 
             uint16_t state_buffer[ADC_POT_STATE_SIZE(NUM_ADC, LUT_SIZE, FILTER_DEPTH)];
