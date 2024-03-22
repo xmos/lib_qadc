@@ -110,7 +110,8 @@ pipeline {
       post {
         always {
           archiveArtifacts artifacts: "**/*.bin", fingerprint: true, allowEmptyArchive: true
-          junit '**/reports/*.xml'
+          // junit '**/reports/*.xml'
+          // TODO re-enable when using Pytest
         }
         cleanup {
           xcoreCleanSandbox()
