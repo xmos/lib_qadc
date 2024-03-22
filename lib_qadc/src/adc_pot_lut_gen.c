@@ -4,6 +4,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <string.h>
 #include <assert.h>
 #include <platform.h>
 #include "adc_utils.h"
@@ -14,8 +15,8 @@ void gen_lookup_pot(uint16_t * up, uint16_t * down, unsigned num_points,
                     uint32_t *max_lut_ticks_up, uint32_t *max_lut_ticks_down){
     dprintf("gen_lookup\n");
     
-    // memset(up, 0, num_points * sizeof(up[0]));
-    // memset(down, 0, num_points * sizeof(down[0]));
+    memset(up, 0, num_points * sizeof(up[0]));
+    memset(down, 0, num_points * sizeof(down[0]));
 
     *max_lut_ticks_down = 0;
     *max_lut_ticks_up = 0;

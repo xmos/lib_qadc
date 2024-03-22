@@ -54,4 +54,7 @@ void gen_lookup_pot(uint16_t * up, uint16_t * down, unsigned num_points,
                     uint32_t *max_lut_ticks_up, uint32_t *max_lut_ticks_down);
 #endif
 
+// For checking if running under sim or not
+unsigned int isSimulation();
+
 #endif
