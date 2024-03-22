@@ -44,7 +44,6 @@ pipeline {
       }
 
       stages {
-
         stage('Checkout') {
           steps {
             runningOn(env.NODE_NAME)
@@ -88,7 +87,7 @@ pipeline {
                     buildApps([
                       "qadc_pot_example"
                     ]) // buildApps
-                  }
+                  } // dir
                 } // withEnv
               } // withTools
             } // dir
@@ -97,11 +96,13 @@ pipeline {
         stage('Tests') {
           steps { 
             dir('lib_qadc/tests') {
-              withVenv {
-                withTools(params.TOOLS_VERSION) {
-                  sh 'python test_qadc_pot_lut.py'
-                } // withTools
-              } // withVenv
+              withEnv(["XMOS_CMAKE_PATH=${WORKSPACE}/xcommon_cmake"]) {
+                withVenv {
+                  withTools(params.TOOLS_VERSION) {
+                    sh 'python test_qadc_pot_lut.py'
+                  } // withTools
+                } // withVenv
+              } // withEnv
             } // dir
           } // steps
         } // Tests
