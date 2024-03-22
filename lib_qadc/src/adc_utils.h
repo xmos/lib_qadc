@@ -4,8 +4,8 @@
 #ifndef __ADC_UTILS__
 #define __ADC_UTILS__
 
-#define dprintf(...) printf(__VA_ARGS__) 
-// #define dprintf(...) 
+// #define dprintf(...) printf(__VA_ARGS__) 
+#define dprintf(...) 
 
 // Pad control defines
 #define PULL_NONE       0x0

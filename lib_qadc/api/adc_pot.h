@@ -23,8 +23,8 @@ typedef struct adc_pot_config_t{
     unsigned read_interval_ticks;
 }adc_pot_config_t;
 
-typedef int32_t q7_24_fixed_t;
-#define Q_7_24_SHIFT    24
+typedef uint16_t         q3_13_fixed_t;
+#define Q_3_13_SHIFT    13
 
 
 typedef struct adc_pot_state_t{
@@ -43,10 +43,10 @@ typedef struct adc_pot_state_t{
     uint16_t * unsafe cal_down;
     uint32_t max_lut_ticks_up;
     uint32_t max_lut_ticks_down;
-    uint32_t max_seen_ticks_up;
-    uint32_t max_seen_ticks_down;
+    uint16_t * unsafe max_seen_ticks_up;
+    uint16_t * unsafe max_seen_ticks_down;
+    q3_13_fixed_t * unsafe max_scale;
     unsigned crossover_idx;
-    q7_24_fixed_t max_scale;
     uint32_t port_time_offset;
     uint16_t * unsafe conversion_history;
     uint16_t * unsafe hysteris_tracker;
@@ -54,10 +54,12 @@ typedef struct adc_pot_state_t{
 
 
 
-
+// results, filter, hysteresis, max_ticks * 2, scale, lut * 2
 #define ADC_POT_STATE_SIZE(num_adc, lut_size, filter_depth)              (( \
                              (sizeof(uint16_t) * num_adc) +                 \
                              (sizeof(uint16_t) * num_adc * filter_depth) +  \
+                             (sizeof(uint16_t) * num_adc) +                 \
+                             (sizeof(uint16_t) * num_adc * 2) +             \
                              (sizeof(uint16_t) * num_adc) +                 \
                              (sizeof(uint16_t) * 2 * lut_size) +            \
                              (sizeof(uint16_t) - 1)) / sizeof(uint16_t))

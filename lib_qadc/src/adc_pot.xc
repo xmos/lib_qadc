@@ -76,7 +76,7 @@ static inline unsigned ticks_to_position(int is_up,
                                         uint16_t * unsafe down,
                                         unsigned num_points,
                                         unsigned port_time_offset,
-                                        q7_24_fixed_t max_scale){
+                                        q3_13_fixed_t max_scale){
     unsigned max_arg = 0;
 
     // Remove fixed proc time overhead (nulls end positions)
@@ -87,7 +87,7 @@ static inline unsigned ticks_to_position(int is_up,
     }
 
     //Apply scaling (for best adjusting crossover smoothness)
-    uint16_t scaled_ticks = ((int64_t)max_scale * (int64_t)ticks) >> Q_7_24_SHIFT;
+    ticks = ((int64_t)max_scale * (int64_t)ticks) >> Q_3_13_SHIFT;
 
     if(is_up) unsafe{
         uint16_t max = 0;
@@ -127,7 +127,7 @@ void adc_pot_init(  size_t num_adc,
                     adc_pot_config_t adc_config,
                     adc_pot_state_t &adc_pot_state) {
     unsafe{
-        memset(state_buffer, 0, sizeof(uint16_t) * ADC_POT_STATE_SIZE(num_adc, lut_size, filter_depth));
+        memset(state_buffer, 0, ADC_POT_STATE_SIZE(num_adc, lut_size, filter_depth));
 
         adc_pot_state.num_adc = num_adc;
         adc_pot_state.lut_size = lut_size;
@@ -135,16 +135,12 @@ void adc_pot_init(  size_t num_adc,
         adc_pot_state.result_hysteresis = result_hysteresis;
         adc_pot_state.port_time_offset = 32;
 
-        adc_pot_state.max_seen_ticks_up = 0;
-        adc_pot_state.max_seen_ticks_up = 0;
-
         // Copy config
         adc_pot_state.adc_config.capacitor_pf = adc_config.capacitor_pf;
         adc_pot_state.adc_config.resistor_ohms = adc_config.resistor_ohms;
         adc_pot_state.adc_config.resistor_series_ohms = adc_config.resistor_series_ohms;
         adc_pot_state.adc_config.v_rail = adc_config.v_rail;
         adc_pot_state.adc_config.v_thresh = adc_config.v_thresh;
-        adc_pot_state.max_scale = 1 << Q_7_24_SHIFT;
         adc_pot_state.adc_config.read_interval_ticks = adc_config.read_interval_ticks;
 
         // Initialise pointers into state buffer blob
@@ -155,12 +151,25 @@ void adc_pot_init(  size_t num_adc,
         ptr += filter_depth * num_adc;
         adc_pot_state.hysteris_tracker = ptr;
         ptr += num_adc;
+        adc_pot_state.max_seen_ticks_up = ptr;
+        ptr += num_adc;
+        adc_pot_state.max_seen_ticks_down = ptr;
+        ptr += num_adc;
+        adc_pot_state.max_scale = ptr;
+        ptr += num_adc;
         adc_pot_state.cal_up = ptr;
         ptr += lut_size;
         adc_pot_state.cal_down = ptr;
         ptr += lut_size;
         unsigned limit = (unsigned)state_buffer + sizeof(uint16_t) * ADC_POT_STATE_SIZE(num_adc, lut_size, filter_depth);
         assert(ptr == limit);
+
+        // Set scale and clear tide marks
+        for(int i = 0; i < num_adc; i++){
+            adc_pot_state.max_scale[i] = 1 << Q_3_13_SHIFT;
+            adc_pot_state.max_seen_ticks_up[i] = 0;
+            adc_pot_state.max_seen_ticks_down[i] = 0;
+        }
 
         // Generate calibration lookup table
         gen_lookup_pot( adc_pot_state.cal_up, adc_pot_state.cal_down, adc_pot_state.lut_size,
@@ -247,6 +256,7 @@ void adc_pot_task(chanend c_adc, port p_adc[], adc_pot_state_t &adc_pot_state){
             break;
 
             case adc_state == ADC_CONVERTING => p_adc[adc_idx] when pinseq(init_port_val[adc_idx]) :> int _ @ end_time:
+                unsafe{
                 int32_t conversion_time = (end_time - start_time);
                 if(conversion_time < 0){
                     conversion_time += 0x10000; // Account for port timer wrapping
@@ -259,13 +269,13 @@ void adc_pot_task(chanend c_adc, port p_adc[], adc_pot_state_t &adc_pot_state){
                 }
 
                 // Update max seen values. Can help track if actual RC constant is less than expected.
-                if(init_port_val[adc_idx]){
-                    if(conversion_time > adc_pot_state.max_seen_ticks_up){
-                        adc_pot_state.max_seen_ticks_up = conversion_time;
+                if(init_port_val[adc_idx]) unsafe{
+                    if(conversion_time > adc_pot_state.max_seen_ticks_up[adc_idx]){
+                        adc_pot_state.max_seen_ticks_up[adc_idx] = conversion_time;
                     }
-                } else {
-                    if(conversion_time > adc_pot_state.max_seen_ticks_down){
-                        adc_pot_state.max_seen_ticks_down = conversion_time;
+                } else unsafe{
+                    if(conversion_time > adc_pot_state.max_seen_ticks_down[adc_idx]){
+                        adc_pot_state.max_seen_ticks_down[adc_idx] = conversion_time;
                     }
                 }
 
@@ -284,7 +294,7 @@ void adc_pot_task(chanend c_adc, port p_adc[], adc_pot_state_t &adc_pot_state){
                                                     adc_pot_state.cal_down,
                                                     adc_pot_state.lut_size,
                                                     adc_pot_state.port_time_offset,
-                                                    adc_pot_state.max_scale);
+                                                    adc_pot_state.max_scale[adc_idx]);
                 uint16_t post_proc_result = post_process_result(result,
                                                                 adc_pot_state.conversion_history,
                                                                 adc_pot_state.hysteris_tracker,
@@ -292,10 +302,10 @@ void adc_pot_task(chanend c_adc, port p_adc[], adc_pot_state_t &adc_pot_state){
                                                                 adc_pot_state.filter_depth,
                                                                 adc_pot_state.lut_size,
                                                                 adc_pot_state.result_hysteresis);
-                unsafe{adc_pot_state.results[adc_idx] = post_proc_result;}
+                adc_pot_state.results[adc_idx] = post_proc_result;
                 tmr_charge :> t1; 
                 dprintf("result: %u post_proc: %u ticks: %u is_up: %d proc_ticks: %d mu: %lu md: %lu\n",
-                    result, post_proc_result, conversion_time, init_port_val[adc_idx], t1-t0, adc_pot_state.max_seen_ticks_up, adc_pot_state.max_seen_ticks_down);
+                    result, post_proc_result, conversion_time, init_port_val[adc_idx], t1-t0, adc_pot_state.max_seen_ticks_up[adc_idx], adc_pot_state.max_seen_ticks_down[adc_idx]);
 
 
                 if(++adc_idx == adc_pot_state.num_adc){
@@ -309,6 +319,7 @@ void adc_pot_task(chanend c_adc, port p_adc[], adc_pot_state_t &adc_pot_state){
                 }
 
                 adc_state = ADC_IDLE;
+                }
             break;
 
             // This case happens if the hardware RC constant is much higher than expected
