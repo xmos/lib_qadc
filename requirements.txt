@@ -3,7 +3,6 @@
 # dependencies
 numpy
 matplotlib
-subprocess
 pathlib
 flake8==3.8.3
 pylint==2.5.3
