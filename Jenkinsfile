@@ -81,15 +81,14 @@ pipeline {
         stage('Build') {
           steps {
             sh "git clone -b develop git@github.com:xmos/xcommon_cmake ${WORKSPACE}/xcommon_cmake"
-            dir('lib_qadc') {
+            dir('lib_qadc/examples') {
               withTools(params.TOOLS_VERSION) {
                 withEnv(["XMOS_CMAKE_PATH=${WORKSPACE}/xcommon_cmake"]) {
-                  buildApps([
-                    "examples/fileio_features_xc",
-                    "examples/throughput_c",
-                    "tests/no_hang",
-                    "tests/close_files",
-                  ]) // buildApps
+                  dir("pot_reader"){
+                    buildApps([
+                      "qadc_pot_example"
+                    ]) // buildApps
+                  }
                 } // withEnv
               } // withTools
             } // dir
