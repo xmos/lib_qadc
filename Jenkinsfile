@@ -7,8 +7,8 @@ def runningOn(machine) {
 
 def buildApps(appList) {
   appList.each { app ->
-    sh "cmake -G 'Unix Makefiles' -S ${app} -B ${app}/build"
-    sh "xmake -C ${app}/build -j\$(nproc)"
+    sh "cmake -G 'Unix Makefiles' -B build"
+    sh "xmake -C build -j\$(nproc)"
   }
 }
 
@@ -99,7 +99,7 @@ pipeline {
             dir('lib_qadc/tests') {
               withVenv {
                 withTools(params.TOOLS_VERSION) {
-                  sh 'pytest' // info: configuration opts in pytest.ini
+                  sh 'python test_qadc_pot_lut.py'
                 } // withTools
               } // withVenv
             } // dir

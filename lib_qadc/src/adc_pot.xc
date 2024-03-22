@@ -123,10 +123,8 @@ static inline unsigned ticks_to_position(int is_up,
         }
     } else unsafe{
         //Apply scaling (for best adjusting crossover smoothness)
-        // printuintln(ticks);
-        // ticks = ((int64_t)max_scale_down * (int64_t)ticks) >> Q_3_13_SHIFT;
         ticks = (uint32_t)ticks << Q_3_13_SHIFT / max_scale_down;
-        // printuintln(ticks);
+        // ticks = ((int64_t)max_scale_down * (int64_t)ticks) >> Q_3_13_SHIFT;
 
         int16_t max = 0;
         for(int i = 0; i < num_points; i++){
@@ -315,7 +313,7 @@ void adc_pot_task(chanend c_adc, port p_adc[], adc_pot_state_t &adc_pot_state){
                     int t0, t1;
                     tmr_charge :> t0; 
 
-                    // Turn time into ADC reading
+                    // Turn time and direction into ADC reading
                     uint16_t result = ticks_to_position(init_port_val[adc_idx],
                                                         conversion_time,
                                                         adc_pot_state.cal_up,
@@ -335,7 +333,6 @@ void adc_pot_task(chanend c_adc, port p_adc[], adc_pot_state_t &adc_pot_state){
                     tmr_charge :> t1; 
                     dprintf("result: %u post_proc: %u ticks: %u is_up: %d proc_ticks: %d mu: %lu md: %lu\n",
                         result, post_proc_result, conversion_time, init_port_val[adc_idx], t1-t0, adc_pot_state.max_seen_ticks_up[adc_idx], adc_pot_state.max_seen_ticks_down[adc_idx]);
-
 
                     if(++adc_idx == adc_pot_state.num_adc){
                         adc_idx = 0;
