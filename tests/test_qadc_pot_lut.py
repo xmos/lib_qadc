@@ -2,7 +2,6 @@
 # This Software is subject to the terms of the XMOS Public Licence: Version 1.
 #We assume that the Xscope FileIO Python library has been installed via pip beforehand and is available to import. Please see readme for instuctions.
 import os
-import tempfile
 from pathlib import Path
 import subprocess
 import numpy as np
