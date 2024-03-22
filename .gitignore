@@ -1,2 +1,3 @@
 examples/pot_reader/.build
 filter_settings.h
+pot_lut.bin

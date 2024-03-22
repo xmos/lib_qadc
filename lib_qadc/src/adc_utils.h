@@ -4,6 +4,9 @@
 #ifndef __ADC_UTILS__
 #define __ADC_UTILS__
 
+// #define dprintf(...) printf(__VA_ARGS__) 
+#define dprintf(...) 
+
 // Pad control defines
 #define PULL_NONE       0x0
 #define PULL_UP_WEAK    0x1 // BUG doesn't work. Can half set by using set_pad_properties
@@ -38,6 +41,17 @@
 #define set_pad_drive_mode(port, drive_mode)  {__asm__ __volatile__ ("setc res[%0], %1": : "r" (port) , "r" ((drive_mode << DRIVE_MODE_SHIFT) | \
                                                                                                             XS1_SETC_DRIVE_DRIVE)) ;}
 
+#ifdef __XC__
 float find_threshold_level(float v_rail, port p_adc);
+void gen_lookup_pot(uint16_t * unsafe up, uint16_t * unsafe down, unsigned num_points,
+                    float r_ohms, float capacitor_f, float rs_ohms,
+                    float v_rail, float v_thresh,
+                    uint32_t * unsafe max_lut_ticks_up, uint32_t * unsafe max_lut_ticks_down);
+#else
+void gen_lookup_pot(uint16_t * up, uint16_t * down, unsigned num_points,
+                    float r_ohms, float capacitor_f, float rs_ohms,
+                    float v_rail, float v_thresh,
+                    uint32_t *max_lut_ticks_up, uint32_t *max_lut_ticks_down);
+#endif
 
 #endif

@@ -43,6 +43,7 @@ typedef struct adc_pot_state_t{
     uint32_t max_lut_ticks_down;
     uint32_t max_seen_ticks_up;
     uint32_t max_seen_ticks_down;
+    unsigned crossover_idx;
     q7_24_fixed_t max_scale;
     uint32_t port_time_offset;
     uint16_t * unsafe conversion_history;
