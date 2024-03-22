@@ -53,7 +53,6 @@ void gen_lookup_pot(uint16_t * up, uint16_t * down, unsigned num_points,
             *max_lut_ticks_up = up[i] > *max_lut_ticks_up ? up[i] : *max_lut_ticks_up;
             if(cross_vref_idx == 0){
                 cross_vref_idx = i;
-                printf("cross_vref_idx: %u\n", i);
             }
         } else {
             down[i] = t_down_ticks;

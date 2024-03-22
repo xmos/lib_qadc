@@ -20,6 +20,7 @@ typedef struct adc_pot_config_t{
     unsigned resistor_series_ohms;
     float v_rail;
     float v_thresh;
+    unsigned read_interval_ticks;
 }adc_pot_config_t;
 
 typedef int32_t q7_24_fixed_t;
@@ -33,6 +34,7 @@ typedef struct adc_pot_state_t{
     size_t lut_size;
     size_t filter_depth;
     unsigned result_hysteresis;
+    unsigned adc_read_interval;
     uint16_t * unsafe results;
     adc_pot_config_t adc_config;
 
