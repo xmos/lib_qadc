@@ -104,7 +104,7 @@ pipeline {
               withEnv(["XMOS_CMAKE_PATH=${WORKSPACE}/xcommon_cmake"]) {
                 withVenv {
                   withTools(params.TOOLS_VERSION) {
-                    sh 'python test_qadc_pot_lut.py'
+                    sh 'python -m pytest --junitxml=pytest_result.xml'
                   } // withTools
                 } // withVenv
               } // withEnv
@@ -114,7 +114,7 @@ pipeline {
       } // stages
       post {
         always {
-          archiveArtifacts artifacts: "**/*.png", fingerprint: true, allowEmptyArchive: true
+          archiveArtifacts artifacts: "**/tests/*.png", fingerprint: true, allowEmptyArchive: true
           // junit '**/reports/*.xml'
           // TODO re-enable when using Pytest
         }
