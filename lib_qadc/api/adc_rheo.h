@@ -36,11 +36,11 @@ typedef struct adc_rheo_state_t{
     adc_rheo_config_t adc_config;
 
     // Internal state
-    uint32_t max_disch_ticks;
+    uint16_t max_disch_ticks;
     uint16_t * unsafe max_seen_ticks;
     q3_13_fixed_t * unsafe max_scale;
     unsigned crossover_idx;
-    uint32_t port_time_offset;
+    uint16_t port_time_offset;
     uint16_t * unsafe conversion_history;
     uint16_t * unsafe hysteris_tracker;
 }adc_rheo_state_t;
@@ -60,10 +60,9 @@ typedef struct adc_rheo_state_t{
 #define ADC_CMD_READ                0x01000000ULL         
 #define ADC_CMD_CAL_MODE_START      0x02000000ULL
 #define ADC_CMD_CAL_MODE_FINISH     0x03000000ULL
-#define ADC_CMD_POT_GET_DIR         0x04000000ULL
-#define ADC_CMD_POT_STOP_CONV       0x05000000ULL
-#define ADC_CMD_POT_START_CONV      0x06000000ULL
-#define ADC_CMD_POT_EXIT            0x07000000ULL
+#define ADC_CMD_STOP_CONV           0x05000000ULL
+#define ADC_CMD_START_CONV          0x06000000ULL
+#define ADC_CMD_EXIT                0x07000000ULL
 #define ADC_CMD_MASK                0xff000000ULL
 
 #ifdef __XC__

@@ -32,6 +32,7 @@ static inline uint16_t post_process_result( uint16_t discharge_elapsed_time,
                                             uint16_t *zero_offset_ticks,
                                             uint16_t max_discharge_period_ticks,
                                             uint16_t * unsafe max_scale,
+                                            uint16_t * unsafe max_seen_ticks,
                                             uint16_t * unsafe conversion_history,
                                             uint16_t * unsafe hysteris_tracker,
                                             size_t result_history_depth,
@@ -62,7 +63,7 @@ static inline uint16_t post_process_result( uint16_t discharge_elapsed_time,
         }
         uint16_t filtered_elapsed_time = accum / result_history_depth;
 
-        // Remove zero offset and clip
+        // Remove zero offset and clip negative
         int zero_offsetted_ticks = filtered_elapsed_time - *zero_offset_ticks;
         if(zero_offsetted_ticks < 0){
             if(filter_stable){
@@ -71,32 +72,29 @@ static inline uint16_t post_process_result( uint16_t discharge_elapsed_time,
             zero_offsetted_ticks = 0;
         }
 
-        // Clip count positive
-        // if(zero_offsetted_ticks > max_seen_ticks[adc_idx]){
-        //     if(adc_mode == ADC_CALIBRATION_MANUAL){
-        //         max_offsetted_conversion_time[adc_idx] = zero_offsetted_ticks;
-        //     } else {
-        //         zero_offsetted_ticks = max_offsetted_conversion_time[adc_idx];  
-        //     }
-        // }
+        // Track maximums
+        if(zero_offsetted_ticks > max_seen_ticks[adc_idx]){
+            max_seen_ticks[adc_idx] = zero_offsetted_ticks;
+            // Scale here if using calib
+            // max_scale[adc_idx] = max_seen_ticks[adc_idx] << Q_3_13_SHIFT / max_discharge_period_ticks or something
+        }
+        printf("max_seen: %u\n", max_seen_ticks[adc_idx]);
+
+        // TODO scale to max or just use max seen and remove max_scale?
+        // ticks = ((int64_t)max_scale_up * (int64_t)ticks) >> Q_3_13_SHIFT;
+
+        // Clip positive
+        if(zero_offsetted_ticks > max_discharge_period_ticks){
+            zero_offsetted_ticks = max_discharge_period_ticks;
+        }
+
 
         // Calculate scaled output
         uint16_t scaled_result = 0;
-        scaled_result = (adc_steps * zero_offsetted_ticks) / max_discharge_period_ticks;
-
-
-        // // Clip positive and move max if needed
-        // if(scaled_result > max_result_scale){
-        //     scaled_result = max_result_scale; // Clip
-        //     // Handle moving up the maximum val
-        //     if(adc_mode == ADC_CALIBRATION_MANUAL){
-        //         int new_max_offsetted_conversion_time = (max_result_scale * zero_offsetted_ticks) / scaled_result;
-        //         max_offsetted_conversion_time[adc_idx] += (new_max_offsetted_conversion_time - max_offsetted_conversion_time[adc_idx]);
-        //     }
-        // }
+        scaled_result = ((adc_steps - 1) * zero_offsetted_ticks) / max_discharge_period_ticks;
 
         // Apply hysteresis
-        if(scaled_result > hysteris_tracker[adc_idx] + result_hysteresis || scaled_result == max_scale){
+        if(scaled_result > hysteris_tracker[adc_idx] + result_hysteresis || scaled_result == (adc_steps - 1)){
             hysteris_tracker[adc_idx] = scaled_result;
         }
         if(scaled_result < hysteris_tracker[adc_idx] - result_hysteresis || scaled_result == 0){
@@ -174,6 +172,7 @@ void adc_rheo_init( size_t num_adc,
 
         const unsigned t_down_ticks = (unsigned)(t_down * XS1_TIMER_HZ);
         adc_rheo_state.max_disch_ticks = t_down_ticks;
+        assert(adc_rheo_state.max_disch_ticks * 2 < 65536); // We have a 16b port timer, so if max is more than this, then we need to slow clock or lower
         // printf("max_disch_ticks: %u\n", adc_rheo_state.max_disch_ticks);
 
         // Initialise pointers into state buffer blob
@@ -214,7 +213,7 @@ void adc_rheo_task(chanend c_adc, port p_adc[], adc_rheo_state_t &adc_rheo_state
     timer tmr_overshoot;
 
     // Set all ports to input and set drive strength
-    const int port_drive = DRIVE_4MA;
+    const int port_drive = DRIVE_2MA;
     for(int i = 0; i < adc_rheo_state.num_adc; i++){
         unsigned dummy;
         p_adc[i] :> dummy;
@@ -222,48 +221,16 @@ void adc_rheo_task(chanend c_adc, port p_adc[], adc_rheo_state_t &adc_rheo_state
 
     }
 
-    const unsigned capacitor_pf = adc_rheo_state.adc_config.capacitor_pf;
-    const unsigned resistor_series_ohms = adc_rheo_state.adc_config.resistor_series_ohms;
-
-    const unsigned port_time_offset = adc_rheo_state.port_time_offset; 
     const uint32_t convert_interval_ticks = adc_rheo_state.adc_config.convert_interval_ticks;
 
 
+    const unsigned capacitor_pf = adc_rheo_state.adc_config.capacitor_pf;
+    const unsigned resistor_series_ohms = adc_rheo_state.adc_config.resistor_series_ohms;
     const int rc_times_to_charge_fully = 10; // 5 RC times should be sufficient but use double for best scaling
     const uint32_t max_charge_period_ticks = ((uint64_t)rc_times_to_charge_fully * capacitor_pf * resistor_series_ohms) / 10000;
 
     assert(convert_interval_ticks > max_charge_period_ticks + adc_rheo_state.max_disch_ticks * 2); // Ensure conversion rate is low enough. *2 to allow post processing time
     printf("max_charge_period_ticks: %lu max_discharge_period_ticks: %lu\n", max_charge_period_ticks, adc_rheo_state.max_disch_ticks);
-
-    // Calaculate zero offset based on drive strength
-    uint16_t zero_offset_ticks = 0;
-    switch(port_drive){
-        case DRIVE_2MA:
-            zero_offset_ticks = capacitor_pf * 0.024;
-            printstrln("DRIVE_2MA\n");
-        break;
-        case DRIVE_4MA:
-            zero_offset_ticks = capacitor_pf * 0.012;
-            printstrln("DRIVE_4MA\n");
-        break;
-        case DRIVE_8MA:
-            zero_offset_ticks = capacitor_pf * 0.008;
-            printstrln("DRIVE_8MA\n");
-        break;
-        case DRIVE_12MA:
-            zero_offset_ticks = capacitor_pf * 0.006;
-            printstrln("DRIVE_12MA\n");
-        break;
-    }
-
-    // Calibration for scaling to full scale
-    // unsigned max_offsetted_conversion_time[ADC_MAX_NUM_CHANNELS] = {0};
-
-    // Initialise all ports and apply estimated max conversion
-    for(unsigned i = 0; i < adc_rheo_state.num_adc; i++){
-        // max_offsetted_conversion_time[i] = 0; //(resistor_ohms_min * capacitor_pf) / 103; // Calibration factor of / 10.35
-        set_pad_properties(p_adc[i], port_drive, PULL_NONE, 0, 0);
-    }
 
 
  
@@ -290,7 +257,7 @@ void adc_rheo_task(chanend c_adc, port p_adc[], adc_rheo_state_t &adc_rheo_state
 
             case adc_state == ADC_CHARGING => tmr_discharge when timerafter(time_trigger_discharge) :> int _:
                 p_adc[adc_idx] :> int _ @ start_time; // Make Hi Z and grab time
-                time_trigger_overshoot = time_trigger_discharge + adc_rheo_state.max_disch_ticks * 3;
+                time_trigger_overshoot = time_trigger_discharge + adc_rheo_state.max_disch_ticks * 2;
 
                 adc_state = ADC_CONVERTING;
             break;
@@ -304,9 +271,10 @@ void adc_rheo_task(chanend c_adc, port p_adc[], adc_rheo_state_t &adc_rheo_state
                 tmr_charge :> t0; 
                 uint16_t post_proc_result = post_process_result(conversion_time,
                                                                 adc_rheo_state.adc_steps,
-                                                                &zero_offset_ticks,
+                                                                &adc_rheo_state.port_time_offset,
                                                                 adc_rheo_state.max_disch_ticks,
                                                                 adc_rheo_state.max_scale,
+                                                                adc_rheo_state.max_seen_ticks,
                                                                 adc_rheo_state.conversion_history,
                                                                 adc_rheo_state.hysteris_tracker,
                                                                 adc_rheo_state.filter_depth,
@@ -329,9 +297,8 @@ void adc_rheo_task(chanend c_adc, port p_adc[], adc_rheo_state_t &adc_rheo_state
 
             case adc_state == ADC_CONVERTING => tmr_overshoot when timerafter(time_trigger_overshoot) :> int _:
                 p_adc[adc_idx] :> int _ @ end_time;
-                uint16_t post_proc_result = 0;
-                unsafe{adc_rheo_state.results[adc_idx] = post_proc_result;}
-                printf("result: %u overshoot\n", post_proc_result, end_time - start_time);
+                unsafe{adc_rheo_state.results[adc_idx] = adc_rheo_state.adc_steps - 1;}
+                printf("ticks: %u overshoot \n", end_time - start_time);
                 if(++adc_idx == adc_rheo_state.num_adc){
                     adc_idx = 0;
                 }

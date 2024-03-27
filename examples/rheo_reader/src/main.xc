@@ -42,7 +42,7 @@ int main() {
         on tile[1]:{
             chan c_adc;
 
-            const unsigned capacitor_pf = 3000;
+            const unsigned capacitor_pf = 2000;
             const unsigned potentiometer_ohms = 47000; // nominal maximum value ned to end
             const unsigned resistor_series_ohms = 470;
 
@@ -50,7 +50,7 @@ int main() {
             const float v_thresh = 1.15;
             const char auto_scale = 0;
 
-            const unsigned convert_interval_ticks = (10 * XS1_TIMER_KHZ);
+            const unsigned convert_interval_ticks = (50 * XS1_TIMER_KHZ);
             
             const adc_rheo_config_t adc_config = {capacitor_pf,
                                                 potentiometer_ohms,
