@@ -88,6 +88,11 @@ pipeline {
                       "qadc_pot_example"
                     ]) // buildApps
                   } // dir
+                  dir("rheo_reader"){
+                    buildApps([
+                      "qadc_rheo_example"
+                    ]) // buildApps
+                  } // dir
                 } // withEnv
               } // withTools
             } // dir
@@ -109,7 +114,7 @@ pipeline {
       } // stages
       post {
         always {
-          archiveArtifacts artifacts: "**/*.bin", fingerprint: true, allowEmptyArchive: true
+          archiveArtifacts artifacts: "**/*.png", fingerprint: true, allowEmptyArchive: true
           // junit '**/reports/*.xml'
           // TODO re-enable when using Pytest
         }
