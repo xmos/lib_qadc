@@ -14,7 +14,7 @@ sys.path.append(str(root_dir/"design"))
 import qadc_model
 
 
-def test_lut(cap_pf, res_pot, res_ser, vrail, vthresh, num_adc, filter_depth, lut_size, hysteresis):
+def pot_lut_compare(cap_pf, res_pot, res_ser, vrail, vthresh, num_adc, filter_depth, lut_size, hysteresis):
     firmware_xe = root_dir/"tests"/"qadc_lut_pot"/"bin"/"qadc_pot_lut.xe"
     lut_file = file_dir/"pot_lut.bin"
 
@@ -66,5 +66,5 @@ def test_lut(cap_pf, res_pot, res_ser, vrail, vthresh, num_adc, filter_depth, lu
     print("LUT test OK")
 
 
-if __name__ == "__main__":
-    test_lut(3000, 47000, 470, 3.3, 1.14, 1, 32, 1024, 1)
+def test_pot_lut():
+    pot_lut_compare(3000, 47000, 470, 3.3, 1.14, 1, 32, 1024, 1)

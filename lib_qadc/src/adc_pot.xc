@@ -237,7 +237,7 @@ void adc_pot_task(chanend c_adc, port p_adc[], adc_pot_state_t &adc_pot_state){
     int time_trigger_overshoot = 0;
 
     int16_t start_time, end_time;
-    unsigned init_port_val[ADC_MAX_NUM_CHANNELS] = {0};
+    unsigned init_port_val[8] = {0}; // TODO FIX
 
     int32_t max_ticks_expected = 0;
 

@@ -6,7 +6,7 @@ import math
 import numpy as np
 
 
-def plot_curve(x_values, y_values, figname="plot"):
+def plot_curve(x_values, y_values, x_label="Pot position", y_label="100 MHz ticks", figname="plot"):
     plt.clf()
 
     # Plotting the line graph
@@ -14,12 +14,13 @@ def plot_curve(x_values, y_values, figname="plot"):
         plt.plot(x_values, ys)
 
     # Adding labels and title
-    plt.xlabel('Pot position')
+    plt.xlabel(x_label)
+    plt.ylabel(y_label)
     plt.title(figname)
 
     # Displaying the plot
     # plt.show()
-    plt.savefig(figname+".png")
+    plt.savefig(figname+".png", dpi=300)
 
 
 class qadc_rheo:
@@ -31,6 +32,7 @@ class qadc_rheo:
                 v_thresh,       # input threhsold
                 n_lookup=1024):
 
+        self.name = __class__.__name__
         self.max_ticks = 0
         self.v_rail = v_rail
         self.v_thresh = v_thresh
@@ -72,7 +74,7 @@ class qadc_rheo:
         self.down = down
         positions = [p / (n_lookup - 1) for p in list(positions)] #normalise from 0-1
 
-        plot_curve(positions, [down], "ticks_versus_slider")
+        plot_curve(positions, [down], figname="QADC Rheo ticks_versus_slider")
 
     def lookup_posn_from_ticks(self, ticks, model=None):
 
@@ -94,7 +96,7 @@ class qadc_rheo:
         idx = int(posn * (self.n_lookup - 1))
         
         #this is ignored for now in this class
-        v_thresh_noise = np.random.triangular(-v_thresh_noise_mv, 0, v_thresh_noise_mv, 1)
+        v_thresh_noise = np.random.triangular(-v_thresh_noise_mv/1000, 0, v_thresh_noise_mv/1000, 1)
         ticks = self.down[idx]
 
         return (ticks,)
@@ -110,6 +112,7 @@ class qadc_pot:
                 v_thresh,       # input threhsold
                 n_lookup=1024):
 
+        self.name = __class__.__name__
         self.n_lookup = n_lookup
         self.v_rail = v_rail
         self.v_thresh = v_thresh
@@ -165,7 +168,7 @@ class qadc_pot:
         self.down = down
         positions = [p / (n_lookup - 1) for p in list(positions)] #normalise from 0-1
 
-        plot_curve(positions, (up, down), "ticks_versus_slider")
+        plot_curve(positions, (up, down), figname="QADC Pot ticks_versus_slider")
 
     def lookup_posn_from_ticks(self, ticks, start_high, model=None):
         if model is None:
@@ -188,10 +191,9 @@ class qadc_pot:
 
         return idx / (n_lookup - 1)
 
-    def get_ticks_and_dir_from_posn(self, posn, v_thresh_noise_mv=0.0001):
+    def get_ticks_and_dir_from_posn(self, posn):
         idx = int(posn * (self.n_lookup - 1))
-        v_thresh_noise = np.random.triangular(-v_thresh_noise_mv, 0, v_thresh_noise_mv, 1)
-        start_high = True if posn * self.v_rail > (self.v_thresh + v_thresh_noise) else False
+        start_high = True if posn * self.v_rail > self.v_thresh else False
 
         if start_high:
             ticks = self.up[idx]
@@ -199,66 +201,3 @@ class qadc_pot:
             ticks = self.down[idx]
 
         return ticks, start_high
-
-
-def sim_sweep(model_cal, models_used, num_points=100):
-    if isinstance(models_used, type(model_cal)) == 1:
-        num_models = 1
-        models_used =[models_used]
-    else:
-        num_models = len(models_used)
-
-    positions = np.linspace(0, 1, num_points)
-    est_positions = np.zeros(num_points)
-    err_positions = np.zeros((num_models, num_points))
-
-    idx = 0
-    for posn in positions:
-        lut = model_cal.get_ticks_and_dir_from_posn(posn, v_thresh_noise_mv=0.08)
-        est_posn = model_cal.lookup_posn_from_ticks(*lut)
-        est_positions[idx] = est_posn
-
-        for m in range(num_models):
-            model = models_used[m]
-            err_posn = model.lookup_posn_from_ticks(*lut)
-            err_positions[m][idx] = err_posn
-
-        idx += 1
-        
-    err_positions = [err_positions[m] for m in range(num_models)]
-    y_values = [est_positions] + err_positions      
-    plot_curve(positions, y_values, figname = "Effect_of_pot_tolerance_20pc")
-
-
-def qadc_rheo_test():
-    r_pot_nom = 47000
-    tolerance = 0.2
-    cap_pf = 3000
-    r_series = 470
-    v_rail = 3.3
-    v_thresh = 1.14
-
-    qadc = qadc_rheo(cap_pf, r_pot_nom, r_series, 3.3, v_thresh)
-    qadc_rheo_is_under = qadc_rheo(cap_pf, r_pot_nom / (1+tolerance), r_series, v_rail, v_thresh)
-    qadc_rheo_is_over = qadc_rheo(cap_pf, r_pot_nom * (1+tolerance), r_series, v_rail, v_thresh)
-    sim_sweep(qadc, (qadc_rheo_is_under, qadc_rheo_is_over))
-
-
-def qadc_pot_test():
-    r_pot_nom = 47000
-    tolerance = 0.2
-    cap_pf = 3000
-    r_series = 470
-    v_rail = 3.3
-    v_thresh = 1.14
-
-    qadc = qadc_pot(cap_pf, r_pot_nom, r_series, 3.3, v_thresh)
-    qadc_pot_is_under = qadc_pot(cap_pf, r_pot_nom / (1+tolerance), r_series, v_rail, v_thresh)
-    qadc_pot_is_over = qadc_pot(cap_pf, r_pot_nom * (1+tolerance), r_series, v_rail, v_thresh)
-    sim_sweep(qadc, (qadc_pot_is_under, qadc_pot_is_over))
-
-
-
-if __name__ == '__main__':
-    qadc_pot_test()
-    # qadc_rheo_test()
