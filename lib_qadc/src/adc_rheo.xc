@@ -28,12 +28,13 @@ typedef enum adc_mode_t{
 }adc_mode_t;
 
 static inline uint16_t post_process_result( uint16_t discharge_elapsed_time,
+                                            size_t adc_steps,
                                             uint16_t *zero_offset_ticks,
-                                            uint16_t max_scale,
-                                            uint16_t *conversion_history,
-                                            uint16_t *hysteris_tracker,
+                                            uint16_t max_discharge_period_ticks,
+                                            uint16_t * unsafe max_scale,
+                                            uint16_t * unsafe conversion_history,
+                                            uint16_t * unsafe hysteris_tracker,
                                             size_t result_history_depth,
-                                            size_t lookup_size,
                                             unsigned result_hysteresis,
                                             unsigned adc_idx,
                                             unsigned num_ports,
@@ -54,12 +55,12 @@ static inline uint16_t post_process_result( uint16_t discharge_elapsed_time,
         }
         // Moving average filter
         int accum = 0;
-        uint16_t *hist_ptr = conversion_history + adc_idx * result_history_depth;
+        uint16_t * unsafe hist_ptr = conversion_history + adc_idx * result_history_depth;
         for(int i = 0; i < result_history_depth; i++){
             accum += *hist_ptr;
             hist_ptr++;
         }
-        int filtered_elapsed_time = accum / result_history_depth;
+        uint16_t filtered_elapsed_time = accum / result_history_depth;
 
         // Remove zero offset and clip
         int zero_offsetted_ticks = filtered_elapsed_time - *zero_offset_ticks;
@@ -71,20 +72,17 @@ static inline uint16_t post_process_result( uint16_t discharge_elapsed_time,
         }
 
         // Clip count positive
-        if(zero_offsetted_ticks > max_scale){
-            if(adc_mode == ADC_CALIBRATION_MANUAL){
-                // max_offsetted_conversion_time[adc_idx] = zero_offsetted_ticks;
-            } else {
-                // zero_offsetted_ticks = max_offsetted_conversion_time[adc_idx];  
-            }
-        }
+        // if(zero_offsetted_ticks > max_seen_ticks[adc_idx]){
+        //     if(adc_mode == ADC_CALIBRATION_MANUAL){
+        //         max_offsetted_conversion_time[adc_idx] = zero_offsetted_ticks;
+        //     } else {
+        //         zero_offsetted_ticks = max_offsetted_conversion_time[adc_idx];  
+        //     }
+        // }
 
         // Calculate scaled output
         uint16_t scaled_result = 0;
-        // if(max_offsetted_conversion_time[adc_idx]){ // Avoid / 0 during calibrate
-        //     scaled_result = (max_result_scale * zero_offsetted_ticks) / max_offsetted_conversion_time[adc_idx];
-        // }
-        scaled_result = zero_offsetted_ticks;
+        scaled_result = (adc_steps * zero_offsetted_ticks) / max_discharge_period_ticks;
 
 
         // // Clip positive and move max if needed
@@ -134,6 +132,7 @@ static inline uint16_t post_process_result( uint16_t discharge_elapsed_time,
 
 
 void adc_rheo_init( size_t num_adc,
+                    size_t adc_steps, 
                     size_t filter_depth,
                     unsigned result_hysteresis,
                     uint16_t *state_buffer,
@@ -144,6 +143,7 @@ void adc_rheo_init( size_t num_adc,
 
         adc_rheo_state.num_adc = num_adc;
         adc_rheo_state.filter_depth = filter_depth;
+        adc_rheo_state.adc_steps = adc_steps;
         adc_rheo_state.result_hysteresis = result_hysteresis;
         adc_rheo_state.port_time_offset = 32; // Tested at 120MHz thread speed
 
@@ -156,6 +156,25 @@ void adc_rheo_init( size_t num_adc,
         adc_rheo_state.adc_config.convert_interval_ticks = adc_config.convert_interval_ticks;
         adc_rheo_state.adc_config.auto_scale = adc_config.auto_scale;
 
+        // Calc
+
+        const float v_rail = adc_config.v_rail;
+        const float v_thresh = adc_config.v_thresh;
+        const float r_rheo_max = adc_config.potentiometer_ohms;
+        const float capacitor_f = adc_config.capacitor_pf / 1e12;
+
+        // Calculate actual charge voltage of capacitor
+        const float v_charge_h = r_rheo_max / (r_rheo_max + adc_config.resistor_series_ohms) * v_rail;
+        // printf("v_charge_h: %f\n", v_charge_h);
+        
+        // Calc the maximum discharge time to threshold
+        const float v_down_offset = v_rail - v_charge_h;
+        const float t_down = (-r_rheo_max) * capacitor_f * log(1 - (v_rail - v_thresh - v_down_offset) / (v_rail - 0.0 - v_down_offset));  
+        // printf("t_down: %f\n", t_down);
+
+        const unsigned t_down_ticks = (unsigned)(t_down * XS1_TIMER_HZ);
+        adc_rheo_state.max_disch_ticks = t_down_ticks;
+        // printf("max_disch_ticks: %u\n", adc_rheo_state.max_disch_ticks);
 
         // Initialise pointers into state buffer blob
         uint16_t * unsafe ptr = state_buffer;
@@ -204,27 +223,20 @@ void adc_rheo_task(chanend c_adc, port p_adc[], adc_rheo_state_t &adc_rheo_state
     }
 
     const unsigned capacitor_pf = adc_rheo_state.adc_config.capacitor_pf;
-    const unsigned potentiometer_ohms = adc_rheo_state.adc_config.potentiometer_ohms;
     const unsigned resistor_series_ohms = adc_rheo_state.adc_config.resistor_series_ohms;
-
-    const float v_rail = adc_rheo_state.adc_config.v_rail;
-    const float v_thresh = adc_rheo_state.adc_config.v_thresh;
 
     const unsigned port_time_offset = adc_rheo_state.port_time_offset; 
     const uint32_t convert_interval_ticks = adc_rheo_state.adc_config.convert_interval_ticks;
 
 
-    const int rc_times_to_charge_fully = 10; // 5 RC times should be sufficient but double it for best accuracy
+    const int rc_times_to_charge_fully = 10; // 5 RC times should be sufficient but use double for best scaling
     const uint32_t max_charge_period_ticks = ((uint64_t)rc_times_to_charge_fully * capacitor_pf * resistor_series_ohms) / 10000;
 
-    const int num_time_constants_disch_max = 3;
-    const uint32_t max_discharge_period_ticks = ((uint64_t)capacitor_pf * num_time_constants_disch_max * potentiometer_ohms) / 10000;
-
-    assert(convert_interval_ticks < max_charge_period_ticks + max_discharge_period_ticks * 2); // Ensure conversion rate is low enough. *2 to allow post processing time
-    printf("max_charge_period_ticks: %lu max_discharge_period_ticks: %lu\n", max_charge_period_ticks, max_discharge_period_ticks);
+    assert(convert_interval_ticks > max_charge_period_ticks + adc_rheo_state.max_disch_ticks * 2); // Ensure conversion rate is low enough. *2 to allow post processing time
+    printf("max_charge_period_ticks: %lu max_discharge_period_ticks: %lu\n", max_charge_period_ticks, adc_rheo_state.max_disch_ticks);
 
     // Calaculate zero offset based on drive strength
-    unsigned zero_offset_ticks = 0;
+    uint16_t zero_offset_ticks = 0;
     switch(port_drive){
         case DRIVE_2MA:
             zero_offset_ticks = capacitor_pf * 0.024;
@@ -265,9 +277,7 @@ void adc_rheo_task(chanend c_adc, port p_adc[], adc_rheo_state_t &adc_rheo_state
     int time_trigger_discharge = 0;
     int time_trigger_overshoot = 0;
 
-    int16_t start_time, end_time;
-    unsigned init_port_val = 0;
-
+    int16_t start_time = 0, end_time = 0;
 
     while(1){
         select{
@@ -280,7 +290,7 @@ void adc_rheo_task(chanend c_adc, port p_adc[], adc_rheo_state_t &adc_rheo_state
 
             case adc_state == ADC_CHARGING => tmr_discharge when timerafter(time_trigger_discharge) :> int _:
                 p_adc[adc_idx] :> int _ @ start_time; // Make Hi Z and grab time
-                time_trigger_overshoot = time_trigger_discharge + max_discharge_period_ticks;
+                time_trigger_overshoot = time_trigger_discharge + adc_rheo_state.max_disch_ticks * 3;
 
                 adc_state = ADC_CONVERTING;
             break;
@@ -292,12 +302,21 @@ void adc_rheo_task(chanend c_adc, port p_adc[], adc_rheo_state_t &adc_rheo_state
                 }
                 int t0, t1;
                 tmr_charge :> t0; 
-                uint16_t result = 0;
-                // uint16_t post_proc_result = post_process_result(result, (uint16_t *)conversion_history, hysteris_tracker, adc_idx, num_adc);
-                uint16_t post_proc_result = 0;
+                uint16_t post_proc_result = post_process_result(conversion_time,
+                                                                adc_rheo_state.adc_steps,
+                                                                &zero_offset_ticks,
+                                                                adc_rheo_state.max_disch_ticks,
+                                                                adc_rheo_state.max_scale,
+                                                                adc_rheo_state.conversion_history,
+                                                                adc_rheo_state.hysteris_tracker,
+                                                                adc_rheo_state.filter_depth,
+                                                                adc_rheo_state.result_hysteresis,
+                                                                adc_idx,
+                                                                adc_rheo_state.num_adc,
+                                                                adc_mode);
                 unsafe{adc_rheo_state.results[adc_idx] = post_proc_result;}
                 tmr_charge :> t1; 
-                printf("ticks: %u result: %u post_proc: %u ticks: %d proc_ticks: %d\n", conversion_time, result, post_proc_result, conversion_time, t1-t0);
+                printf("ticks: %u post_proc: %u: proc_ticks: %d\n", conversion_time, post_proc_result, t1-t0);
 
 
                 if(++adc_idx == adc_rheo_state.num_adc){
