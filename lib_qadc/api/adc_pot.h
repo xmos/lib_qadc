@@ -49,12 +49,14 @@ typedef struct adc_pot_state_t{
     uint32_t port_time_offset;
     uint16_t * unsafe conversion_history;
     uint16_t * unsafe hysteris_tracker;
+    uint16_t * unsafe init_port_val;
 }adc_pot_state_t;
 
 
 
-// results, filter, hysteresis, max_ticks * 2, scale * 2, lut * 2
+// results, init_port_val, filter, hysteresis, max_ticks * 2, scale * 2, lut * 2
 #define ADC_POT_STATE_SIZE(num_adc, lut_size, filter_depth)              (( \
+                             (sizeof(uint16_t) * num_adc) +                 \
                              (sizeof(uint16_t) * num_adc) +                 \
                              (sizeof(uint16_t) * num_adc * filter_depth) +  \
                              (sizeof(uint16_t) * num_adc) +                 \

@@ -47,7 +47,7 @@ typedef struct adc_rheo_state_t{
 
 
 
-// results, filter, hysteresis, max_ticks, scale, lut * 2
+// results, filter, hysteresis, max_ticks, scale
 #define ADC_RHEO_STATE_SIZE( num_adc, filter_depth)                      (( \
                              (sizeof(uint16_t) * num_adc) +                 \
                              (sizeof(uint16_t) * num_adc * filter_depth) +  \

@@ -52,6 +52,8 @@ void adc_pot_init(  size_t num_adc,
         uint16_t * unsafe ptr = state_buffer;
         adc_pot_state.results = ptr;
         ptr += num_adc;
+        adc_pot_state.init_port_val = ptr;
+        ptr += num_adc;
         adc_pot_state.conversion_history = ptr;
         ptr += filter_depth * num_adc;
         adc_pot_state.hysteris_tracker = ptr;
@@ -237,22 +239,21 @@ void adc_pot_task(chanend c_adc, port p_adc[], adc_pot_state_t &adc_pot_state){
     int time_trigger_overshoot = 0;
 
     int16_t start_time, end_time;
-    unsigned init_port_val[8] = {0}; // TODO FIX
 
     int32_t max_ticks_expected = 0;
+    unsigned is_up = 0; // Copy of adc_pot_state.init_port_val[adc_idx] used for readability
 
-    while(1){
+    while(1) unsafe{
         select{
             case adc_state == ADC_IDLE => tmr_charge when timerafter(time_trigger_charge) :> int _:
-                p_adc[adc_idx] :> init_port_val[adc_idx];
+                p_adc[adc_idx] :> adc_pot_state.init_port_val[adc_idx];
+                is_up = adc_pot_state.init_port_val[adc_idx];
                 time_trigger_discharge = time_trigger_charge + max_charge_period_ticks;
 
-                p_adc[adc_idx] <: init_port_val[adc_idx] ^ 0x1; // Drive opposite to what we read to "charge"
-                unsafe{
-                    max_ticks_expected = init_port_val[adc_idx] != 0 ? 
-                                        ((uint32_t)adc_pot_state.max_lut_ticks_up * (uint32_t)adc_pot_state.max_scale_up[adc_idx]) >> Q_3_13_SHIFT :
-                                        ((uint32_t)adc_pot_state.max_lut_ticks_down * (uint32_t)adc_pot_state.max_scale_down[adc_idx]) >> Q_3_13_SHIFT;
-                }
+                p_adc[adc_idx] <: (unsigned)adc_pot_state.init_port_val[adc_idx] ^ 0x1; // Drive opposite to what we read to "charge"
+                max_ticks_expected = is_up != 0 ? 
+                                    ((uint32_t)adc_pot_state.max_lut_ticks_up * (uint32_t)adc_pot_state.max_scale_up[adc_idx]) >> Q_3_13_SHIFT :
+                                    ((uint32_t)adc_pot_state.max_lut_ticks_down * (uint32_t)adc_pot_state.max_scale_down[adc_idx]) >> Q_3_13_SHIFT;
 
                 adc_state = ADC_CHARGING;
             break;
@@ -266,7 +267,7 @@ void adc_pot_task(chanend c_adc, port p_adc[], adc_pot_state_t &adc_pot_state){
                 adc_state = ADC_CONVERTING;
             break;
 
-            case adc_state == ADC_CONVERTING => p_adc[adc_idx] when pinseq(init_port_val[adc_idx]) :> int _ @ end_time:
+            case adc_state == ADC_CONVERTING => p_adc[adc_idx] when pinseq(adc_pot_state.init_port_val[adc_idx]) :> int _ @ end_time:
                 unsafe{
                     int32_t conversion_time = (end_time - start_time);
                     if(conversion_time < 0){
@@ -275,7 +276,7 @@ void adc_pot_task(chanend c_adc, port p_adc[], adc_pot_state_t &adc_pot_state){
 
                     // Update max seen values. Can help tracking if actual RC constant is less than expected.
                     // TODO add logic
-                    if(init_port_val[adc_idx]) unsafe{
+                    if(is_up) unsafe{
                         if(conversion_time > adc_pot_state.max_seen_ticks_up[adc_idx]){
                             adc_pot_state.max_seen_ticks_up[adc_idx] = conversion_time;
                         }
@@ -289,7 +290,7 @@ void adc_pot_task(chanend c_adc, port p_adc[], adc_pot_state_t &adc_pot_state){
                     if(conversion_time > max_ticks_expected){
                         dprintf("soft overshoot: %d (%d)\n", conversion_time, max_ticks_expected);
                         if(adc_pot_state.adc_config.auto_scale){
-                            if(init_port_val[adc_idx]){ // is up
+                            if(is_up){ // is up
                                 q3_13_fixed_t new_scale = ((uint32_t)adc_pot_state.max_scale_up[adc_idx] * (uint32_t)conversion_time) / (uint32_t)max_ticks_expected;
                                 dprintf("up scale: %d (%d)\n", adc_pot_state.max_scale_up[adc_idx], new_scale);
                                 adc_pot_state.max_scale_up[adc_idx] = new_scale;
@@ -314,7 +315,7 @@ void adc_pot_task(chanend c_adc, port p_adc[], adc_pot_state_t &adc_pot_state){
                     tmr_charge :> t0; 
 
                     // Turn time and direction into ADC reading
-                    uint16_t result = ticks_to_position(init_port_val[adc_idx],
+                    uint16_t result = ticks_to_position(is_up,
                                                         conversion_time,
                                                         adc_pot_state.cal_up,
                                                         adc_pot_state.cal_down,
@@ -332,7 +333,7 @@ void adc_pot_task(chanend c_adc, port p_adc[], adc_pot_state_t &adc_pot_state){
                     adc_pot_state.results[adc_idx] = post_proc_result;
                     tmr_charge :> t1; 
                     dprintf("result: %u post_proc: %u ticks: %u is_up: %d proc_ticks: %d mu: %lu md: %lu\n",
-                        result, post_proc_result, conversion_time, init_port_val[adc_idx], t1-t0, adc_pot_state.max_seen_ticks_up[adc_idx], adc_pot_state.max_seen_ticks_down[adc_idx]);
+                        result, post_proc_result, conversion_time, is_up, t1-t0, adc_pot_state.max_seen_ticks_up[adc_idx], adc_pot_state.max_seen_ticks_down[adc_idx]);
 
                     if(++adc_idx == adc_pot_state.num_adc){
                         adc_idx = 0;
@@ -353,7 +354,7 @@ void adc_pot_task(chanend c_adc, port p_adc[], adc_pot_state_t &adc_pot_state){
                 unsigned overshoot_port_val = 0;
                 p_adc[adc_idx] :> overshoot_port_val; // For debug. TODO remove
 
-                uint16_t result = adc_pot_state.crossover_idx + (init_port_val[adc_idx] != 0 ? 1 : 0);
+                uint16_t result = adc_pot_state.crossover_idx + (is_up != 0 ? 1 : 0);
                 uint16_t post_proc_result = post_process_result(result, adc_pot_state.conversion_history, adc_pot_state.hysteris_tracker, adc_idx, adc_pot_state.num_adc, adc_pot_state.filter_depth, adc_pot_state.lut_size, adc_pot_state.result_hysteresis);
                 unsafe{adc_pot_state.results[adc_idx] = post_proc_result;}
 
@@ -382,7 +383,7 @@ void adc_pot_task(chanend c_adc, port p_adc[], adc_pot_state_t &adc_pot_state){
                     break;
                     case ADC_CMD_POT_GET_DIR:
                         uint32_t ch = command & (~ADC_CMD_MASK);
-                        c_adc <: (uint32_t)init_port_val[ch];
+                        c_adc <: (uint32_t)adc_pot_state.init_port_val[ch];
                     break;
                     case ADC_CMD_POT_STOP_CONV:
                         for(int i = 0; i < adc_pot_state.num_adc; i++){
