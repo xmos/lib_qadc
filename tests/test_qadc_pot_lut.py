@@ -42,9 +42,9 @@ def pot_lut_compare(cap_pf, res_pot, res_ser, vrail, vthresh, num_adc, filter_de
 
     # Load output
     lut_dut = np.fromfile(lut_file, dtype=np.uint16)
-
+    
     # Extract LUT
-    offset = num_adc + num_adc * filter_depth + num_adc + num_adc * 2 + num_adc * 2
+    offset = num_adc + num_adc + num_adc * filter_depth + num_adc + num_adc * 2 + num_adc * 2
     lut_dut_up = lut_dut[offset:offset+lut_size] 
     lut_dut_down = lut_dut[offset+lut_size:]
 
