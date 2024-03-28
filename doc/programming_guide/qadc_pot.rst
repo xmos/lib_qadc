@@ -1,162 +1,168 @@
 Quasi ADC Potentiometer Reader
 ==============================
 
-Usage
------
+Introduction
+------------
 
-Stuff
+The xcore offers an inexpensive way to read the value of a variable resistor (rheostat) or a potentiometer without the need for a dedicated ADC component. The performance may be suitable for applications such as reading the position of an analog slider can may then be converted in to a gain control. Resolutions in excess of eight bits can be achieved which is adequate for many applications.
+
+The Quasi ADC (QADC) relies on the fact that the input threshold for the xcore IO is very constant at around 1.16 V for a Vddio of 3.3 V. By charging a capacitor to the full rail and discharging it through a resistor, the RC time constant can be determined. If you know C, then you can read R by timing the transition. As long as VDDIO remains constant between the charge and discharge cycles then the voltage component will cancel out. The xcore offers precise timing of transitions of IO using port logic so a reasonable accuracy ADC can be built using just a couple of additional passive components.
 
 
-Initialization
-..............
+Two schemes are offered which have different pros and cons depending on the application. The table below summarises the approaches.
+
+
+.. _fig_src_filters:
+.. list-table:: QADC Comparison
+     :header-rows: 1
+
+     * - Item
+       - Rheostat reader
+       - Potential reader
+     * - Minimum scale
+       - 0% + small dead zone
+       - 0% + small dead zone
+     * - Maximum scale
+       - Dependent on end to end track tolerance
+       - 100% + small dead zone
+     * - Possible discontinuity or dead zone midway
+       - No
+       - Yes at 35% if tolerance of components poor
+     * - Typical max counts
+       - ~10000
+       - ~10000
+     * - Required VDDIO tolerance
+       - 5%
+       - 5%
+     * - Typical minimum conversion time per channel
+       - ~1 ms
+       - ~1 ms
+     * - Number of channels
+       - Limited by 1 bit port count only
+       - Limited by 1 bit port count only
+     * - Typical ENOBs post filtering 
+       - 8 - 9
+       - 8 - 9
+     * - Requires 5 % capacitor (eg C0G)
+        - Yes
+        - Yes
+     * - Requires calibration
+       - Ideally if passive components worse than 10 % tolerance. Will improve full scale estimated position.
+       - Normally OK up to around 20 % passive tolerance. Will improved 35% transition and linearity.
+     * - Linearity
+       - Good
+       - Reasonable, depending on passive tolerance
+     * - Monotonicity
+       - Yes
+       - Yes
+     * - Resource usage
+       - XXX kB
+       - XXX kB
+
+Noise is always a concern in the analog domain and the QADC is no different. In particular power supply stability and coupled signals (such as running the QADC input close to a digital IO) should be considered when designing the circuitry. Since the QADC relies on continuously charging and discharging a capacitor it is also recommended that any analog supplies on the board are separated from the xcore digital supply to avoid any noise from the QADC conversion process being coupled to places where it would unwelcome.
+
+
+Rheostat Reader
+---------------
+
+The rheostat reader uses just two terminals of a potentiometer which treats it as variable resistor. The scheme works as follows:
+
+- Charge capacitor via IO by driving a `one` and waiting for at least 5 maximum RC charge periods.
+- Make IO open circuit which initiates the discharge. Take the port timer at this point. Setup a `pinseq(0)` event on the port to capture the transition to zero.
+- Wait for transition to 'zero` and take the stop timestamp.
+- Set the port to high impedance because there is no point in fully discharging the capacitor.
+- Calculate difference the difference in time.
+- Post process value to reduce noise and improve linearity.
+
+
+
+.. _fig_qadc_rheo_schem:
+.. figure:: qadc_rheo_schem.pdf
+   :width: 100%
+
+   QADC Rehostat Circuit
+
+
+The rheostat reader offers excellent linearity however it suffers from full scale setting accuracy if the passive components have large tolerances. This may result, for example with 20% tolerances, in full scale being read at 80% (and beyond) of the travel or only 80% being registered at the end of the travel.
+
+Potential Reader
+----------------
+
+The potential reader uses all three terminals of a potentiometer where the track end terminals are connected between ground and Vddio. Depending on the initial reading of the IO pin, the QADC either charges the capacitor to Vddio or discharges it ground and then times the transition through the threshold point to the potential set by the potentiometer via the equivalent resistance of the potentiometer. The equivalent resistance of the potentiometer is the parallel of the upper and lower sections between the wiper and the end terminals. Due to the reasonably complex calculation required to determine the estimated position from the transition time, which includes several precision multiplies, divides and a logarithm, a look up table (LUT) is pre-calculated and initialisation to make the conversion step more efficient.
+
+The scheme works as follows:
+
+- Read the current port value to see if voltage of the potentiometer is above or below threshold
+- Set the inverse port value and wait to charge capacitor fully to the supply rail
+- Set the port to high impedance and take a timestamp
+- Take a timestamp when voltage crosses threshold.
+- Use the lookup table to calculate the start voltage.
+- Post process value to reduce noise and improve linearity.
+
+The potential reader offers good performance and is less susceptible to component tolerances due to the mathematics of using a parallel resistor network and logarithm used. It will always achieve zero and full scale however if tolerances are too large then it may show worse non-linearity than the rheostat reader and, in particular, around the 35% setting point which corresponds the threshold voltage of the IO. It does however always remain monotonic in operation. The fact that a small amount of noise is present when taking readings close to the threshold point and a moving average filter is typically used, these non-itineraries are reduced in practice.
+
 
 
 .. _fig_qadc_pot_schem:
 .. figure:: qadc_pot_schem.pdf
    :width: 100%
 
-   QADC Potentiometer circuit
+   QADC Potentiometer Circuit
 
 
-SRC Filter list
-...............
 
-A complete list of the filters supported by the SRC library, both SSRC and ASRC, is shown in :numref:`fig_src_filters`. The filters are implemented in C within the ``FilterDefs.c`` function and the coefficients can be found in the ``/FilterData`` folder. The particular combination of filters cascaded together for a given sample rate change is specified in ``ssrc.c`` and ``asrc.c``.
+.. _fig_qadc_pot_equiv_schem:
+.. figure:: qadc_pot_equiv_schem.pdf
+   :width: 100%
+
+   QADC Potentiometer Equivalent Circuit
 
 
-.. _fig_src_filters:
-.. list-table:: SRC Filter Specifications
-     :header-rows: 2
 
-     * - Filter
-       - Fs (norm)
-       - Passband
-       - Stopband
-       - Ripple
-       - Attenuation
-       - Taps
-       - Notes
-     * - BL
-       - 2
-       - 0.454
-       - 0.546
-       - 0.01 dB
-       - 155 dB
-       - 144
-       - Down-sampler by two, steep
-     * - BL9644
-       - 2
-       - 0.417
-       - 0.501
-       - 0.01 dB
-       - 155 dB
-       - 160
-       - Low-pass filter, steep for 96 to 44.1
-     * - BL8848
-       - 2
-       - 0.494
-       - 0.594
-       - 0.01 dB
-       - 155 dB
-       - 144
-       - Low-pass, steep for 88.2 to 48
-     * - BLF
-       - 2
-       - 0.41
-       - 0.546
-       - 0.01 dB
-       - 155 dB
-       - 96
-       - Low-pass at half band
-     * - BL19288
-       - 2
-       - 0.365
-       - 0.501
-       - 0.01 dB
-       - 155 dB
-       - 96
-       - Low pass, steep for 192 to 88.2
-     * - BL17696
-       - 2
-       - 0.455
-       - 0.594
-       - 0.01 dB
-       - 155 dB
-       - 96
-       - Low-pass, steep for 176.4 to 96
-     * - UP
-       - 2
-       - 0.454
-       - 0.546
-       - 0.01 dB
-       - 155 dB
-       - 144
-       - Over sample by 2, steep
-     * - UP4844
-       - 2
-       - 0.417
-       - 0.501
-       - 0.01 dB
-       - 155 dB
-       - 160
-       - Over sample by 2, steep for 48 to 44.1
-     * - UPF
-       - 2
-       - 0.41
-       - 0.546
-       - 0.01 dB
-       - 155 dB
-       - 96
-       - Over sample by 2, steep for 176.4 to 192
-     * - UP192176
-       - 2
-       - 0.365
-       - 0.501
-       - 0.01 dB
-       - 155 dB
-       - 96
-       - Over sample by 2, steep for 192 to 176.4
-     * - DS
-       - 4
-       - 0.57
-       - 1.39
-       - 0.01 dB
-       - 160 dB
-       - 32
-       - Down sample by 2, relaxed
-     * - OS
-       - 2
-       - 0.57
-       - 1.39
-       - 0.01 dB
-       - 160 dB
-       - 32
-       - Over sample by 2, relaxed
-     * - HS294
-       - 284
-       - 0.55
-       - 1.39
-       - 0.01 dB
-       - 155 dB
-       - 2352
-       - Polyphase 147/160 rate change
-     * - HS320
-       - 320
-       - 0.55
-       - 1.40
-       - 0.01 dB
-       - 151 dB
-       - 2560
-       - Polyphase 160/147 rate change
-     * - ADFIR
-       - 256
-       - 0.45
-       - 1.45
-       - 0.012 dB
-       - 170 dB
-       - 1920
-       - Adaptive polyphase prototype filter
+Post Processing
+---------------
 
+Both QADC schemes benefit from post processing of the raw measured transition time to improve performance.  The included post processing steps are as follows:
+
+Zero Offset Removal
+...................
+
+There is a minimum time the architecture can setup a transition event on the port and the circuitry discharge a capacitor. The first post processing stage is therefore to remove this offset so that the zero scale (and full scale in the case of the potentiometer scheme) can be read as correctly.
+
+Moving Average Filter
+.....................
+
+The moving average filter (sometimes know as a Boxcar FIR) helps filter out noise from the raw signal. It uses a conversion of history and takes the average value of the conversion and effectively low-pass filters the signal. One filter if provided per channel and the depth of the filter is configurable. A typical depth of 32 has been found to provide a good performance. Due to the low pass effect very long filters will reduce the response time of the QADC.
+
+Scaling
+.......
+
+Scaling typically means reducing the resolution of the ADC from 12 - 13 bits and quantising it to a typical bit resolution such at 8, 9 or 10 bits. This provides a signal which has a know range, for example, 0 - 511 for the 9 bit case. This step also offers the possibility of calibration where the tolerance of the passive components may affect the estimated position of the input.
+
+Hysteresis
+..........
+
+Even after filtering it may still be possible to see some small noise signal depending on configuration. This may also be exaggerated due to the natural quantisation to a digital value by the QADC, particularly if the setting is close to a transition point. By adding a small hysteresis (say a value of one or two) additional stability can be achieved at the cost of a very small dead zone at the last position. This may desirable if the QADC output is controlling a parameter that may be noticeable if it hunts between one or more positions. The hysteresis is configurable and may be removed completely if needed.
+
+
+Comparing the Effect of Passive Tolerance on Both Schemes
+---------------------------------------------------------
+
+.. _fig_qadc_pot_equiv_schem:
+.. figure:: qadc_pot_equiv_schem.pdf
+   :width: 100%
+
+   QADC Potentiometer Equivalent Circuit
+
+
+.. _fig_qadc_pot_equiv_schem:
+.. figure:: qadc_pot_equiv_schem.pdf
+   :width: 100%
+
+   QADC Potentiometer Equivalent Circuit
+
+Component Value Selection
+-------------------------
 
 
 
