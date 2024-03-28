@@ -6,7 +6,7 @@ Introduction
 
 The xcore offers an inexpensive way to read the value of a variable resistor (rheostat) or a potentiometer without the need for a dedicated ADC component. The performance may be suitable for applications such as reading the position of an analog slider can may then be converted in to a gain control. Resolutions in excess of eight bits can be achieved which is adequate for many applications.
 
-The Quasi ADC (QADC) relies on the fact that the input threshold for the xcore IO is very constant at around 1.16 V for a Vddio of 3.3 V. By charging a capacitor to the full rail and discharging it through a resistor, the RC time constant can be determined. If you know C, then you can read R by timing the transition. As long as VDDIO remains constant between the charge and discharge cycles then the voltage component will cancel out. The xcore offers precise timing of transitions of IO using port logic so a reasonable accuracy ADC can be built using just a couple of additional passive components.
+The Quasi ADC (QADC) relies on the fact that the input threshold for the xcore IO is very constant at around 1.16 V for a Vddio of 3.3 V. By charging a capacitor to the full rail and discharging it through a resistor, the RC time constant can be determined. If you know C, then you can read R by timing the transition. As long as VDDIO remains constant between the charge and discharge cycles then the voltage component will cancel out. The xcore offers precise timing of transitions of IO using port logic (in this case 10 ns resolution) so a reasonable accuracy ADC can be implemented using just a couple of additional passive components.
 
 
 Two schemes are offered which have different pros and cons depending on the application. The table below summarises the approaches.
@@ -41,8 +41,8 @@ Two schemes are offered which have different pros and cons depending on the appl
        - Limited by 1 bit port count only
        - Limited by 1 bit port count only
      * - Typical ENOBs post filtering 
-       - 8 - 9
-       - 8 - 9
+       - 8 / 9
+       - 8 / 9
      * - Requires 5 % capacitor (eg C0G)
         - Yes
         - Yes
@@ -77,7 +77,7 @@ The rheostat reader uses just two terminals of a potentiometer which treats it a
 
 
 .. _fig_qadc_rheo_schem:
-.. figure:: qadc_rheo_schem.pdf
+.. figure:: images/qadc_rheo_schem.pdf
    :width: 100%
 
    QADC Rehostat Circuit
@@ -85,10 +85,33 @@ The rheostat reader uses just two terminals of a potentiometer which treats it a
 
 The rheostat reader offers excellent linearity however it suffers from full scale setting accuracy if the passive components have large tolerances. This may result, for example with 20% tolerances, in full scale being read at 80% (and beyond) of the travel or only 80% being registered at the end of the travel.
 
+
+.. _fig_qadc_rheo_ticks:
+.. figure:: images/qadc_rheo_ticks.png
+   :width: 100%
+
+   QADC Rehostat Timer Ticks vs Position
+
+
 Potential Reader
 ----------------
 
 The potential reader uses all three terminals of a potentiometer where the track end terminals are connected between ground and Vddio. Depending on the initial reading of the IO pin, the QADC either charges the capacitor to Vddio or discharges it ground and then times the transition through the threshold point to the potential set by the potentiometer via the equivalent resistance of the potentiometer. The equivalent resistance of the potentiometer is the parallel of the upper and lower sections between the wiper and the end terminals. Due to the reasonably complex calculation required to determine the estimated position from the transition time, which includes several precision multiplies, divides and a logarithm, a look up table (LUT) is pre-calculated and initialisation to make the conversion step more efficient.
+
+
+.. _fig_qadc_pot_ticks:
+.. figure:: images/qadc_pot_ticks.png
+   :width: 100%
+
+   QADC Potentiometer Timer Ticks vs Position
+
+
+.. _fig_qadc_pot_par_res:
+.. figure:: images/qadc_pot_par_res.pdf
+   :width: 100%
+
+   QADC Potentiometer Equivalent Resistance vs Position
+
 
 The scheme works as follows:
 
@@ -104,7 +127,7 @@ The potential reader offers good performance and is less susceptible to componen
 
 
 .. _fig_qadc_pot_schem:
-.. figure:: qadc_pot_schem.pdf
+.. figure:: images/qadc_pot_schem.pdf
    :width: 100%
 
    QADC Potentiometer Circuit
@@ -112,7 +135,7 @@ The potential reader offers good performance and is less susceptible to componen
 
 
 .. _fig_qadc_pot_equiv_schem:
-.. figure:: qadc_pot_equiv_schem.pdf
+.. figure:: images/qadc_pot_equiv_schem.pdf
    :width: 100%
 
    QADC Potentiometer Equivalent Circuit
@@ -122,7 +145,18 @@ The potential reader offers good performance and is less susceptible to componen
 Post Processing
 ---------------
 
-Both QADC schemes benefit from post processing of the raw measured transition time to improve performance.  The included post processing steps are as follows:
+Both QADC schemes benefit from post processing of the raw measured transition time to improve performance.
+
+
+.. _fig_post_proc:
+.. figure:: images/qadc_post_proc.pdf
+   :width: 100%
+
+   QADC Post Processing Steps
+
+The included post processing steps are as follows:
+
+
 
 Zero Offset Removal
 ...................
@@ -145,25 +179,30 @@ Hysteresis
 Even after filtering it may still be possible to see some small noise signal depending on configuration. This may also be exaggerated due to the natural quantisation to a digital value by the QADC, particularly if the setting is close to a transition point. By adding a small hysteresis (say a value of one or two) additional stability can be achieved at the cost of a very small dead zone at the last position. This may desirable if the QADC output is controlling a parameter that may be noticeable if it hunts between one or more positions. The hysteresis is configurable and may be removed completely if needed.
 
 
-Comparing the Effect of Passive Tolerance on Both Schemes
----------------------------------------------------------
+Comparing the Effect of Passive Component Tolerance on Both Schemes
+-------------------------------------------------------------------
 
-.. _fig_qadc_pot_equiv_schem:
-.. figure:: qadc_pot_equiv_schem.pdf
+.. _fig_qadc_rheo_tol:
+.. figure:: images/qadc_rheo_tol.png
    :width: 100%
 
-   QADC Potentiometer Equivalent Circuit
+   QADC Rehostat Effect of 20% Tolerance
 
 
-.. _fig_qadc_pot_equiv_schem:
-.. figure:: qadc_pot_equiv_schem.pdf
+.. _fig_qadc_pot_tol:
+.. figure:: images/qadc_pot_tol.png
    :width: 100%
 
-   QADC Potentiometer Equivalent Circuit
+   QADC Potentiometer Effect of 20% Tolerance
 
-Component Value Selection
--------------------------
+Passive Component Selection
+---------------------------
 
+There are three components to consider when building one channel of QADC.
+
+The variable resistor should be typically in the order of 20 - 50 kOhms. A lower value such as 10k Ohms may be used but it will either reduce the accuracy of the QADC slightly or require a larger capacitor. Choosing a value significantly of 100 k Ohms or above may also decrease performance due to PCB parasitics or IO input leakage.
+
+The capacitor value should by typically around 2 - 5 nF. Decreasing the value will cause the QADC to be  
 
 
 QADC Potentiometer API

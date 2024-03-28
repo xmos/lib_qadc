@@ -3,4 +3,4 @@ Programming Guide
 
 .. toctree::
 
-   programming_guide/qdac_pot
+   doc/programming_guide/qadc.rst
