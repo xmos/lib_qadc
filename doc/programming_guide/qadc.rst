@@ -44,8 +44,8 @@ Two schemes are offered which have different pros and cons depending on the appl
        - 8 / 9
        - 8 / 9
      * - Requires 5 % capacitor (eg C0G)
-        - Yes
-        - Yes
+       - Yes
+       - Yes
      * - Requires calibration
        - Ideally if passive components worse than 10 % tolerance. Will improve full scale estimated position.
        - Normally OK up to around 20 % passive tolerance. Will improved 35% transition and linearity.
@@ -78,7 +78,7 @@ The rheostat reader uses just two terminals of a potentiometer which treats it a
 
 .. _fig_qadc_rheo_schem:
 .. figure:: images/qadc_rheo_schem.pdf
-   :width: 100%
+   :width: 80%
 
    QADC Rehostat Circuit
 
@@ -88,7 +88,7 @@ The rheostat reader offers excellent linearity however it suffers from full scal
 
 .. _fig_qadc_rheo_ticks:
 .. figure:: images/qadc_rheo_ticks.png
-   :width: 100%
+   :width: 80%
 
    QADC Rehostat Timer Ticks vs Position
 
@@ -101,14 +101,14 @@ The potential reader uses all three terminals of a potentiometer where the track
 
 .. _fig_qadc_pot_ticks:
 .. figure:: images/qadc_pot_ticks.png
-   :width: 100%
+   :width: 80%
 
    QADC Potentiometer Timer Ticks vs Position
 
 
 .. _fig_qadc_pot_par_res:
 .. figure:: images/qadc_pot_par_res.pdf
-   :width: 100%
+   :width: 80%
 
    QADC Potentiometer Equivalent Resistance vs Position
 
@@ -128,7 +128,7 @@ The potential reader offers good performance and is less susceptible to componen
 
 .. _fig_qadc_pot_schem:
 .. figure:: images/qadc_pot_schem.pdf
-   :width: 100%
+   :width: 80%
 
    QADC Potentiometer Circuit
 
@@ -136,7 +136,7 @@ The potential reader offers good performance and is less susceptible to componen
 
 .. _fig_qadc_pot_equiv_schem:
 .. figure:: images/qadc_pot_equiv_schem.pdf
-   :width: 100%
+   :width: 80%
 
    QADC Potentiometer Equivalent Circuit
 
@@ -150,7 +150,7 @@ Both QADC schemes benefit from post processing of the raw measured transition ti
 
 .. _fig_post_proc:
 .. figure:: images/qadc_post_proc.pdf
-   :width: 100%
+   :width: 80%
 
    QADC Post Processing Steps
 
@@ -184,14 +184,14 @@ Comparing the Effect of Passive Component Tolerance on Both Schemes
 
 .. _fig_qadc_rheo_tol:
 .. figure:: images/qadc_rheo_tol.png
-   :width: 100%
+   :width: 80%
 
    QADC Rehostat Effect of 20% Tolerance
 
 
 .. _fig_qadc_pot_tol:
 .. figure:: images/qadc_pot_tol.png
-   :width: 100%
+   :width: 80%
 
    QADC Potentiometer Effect of 20% Tolerance
 
