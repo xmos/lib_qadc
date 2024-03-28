@@ -75,3 +75,5 @@ def test_tolernace():
     qadc_pot_test(20)
     qadc_rheo_test(20)
 
+if __name__ == "__main__":
+    test_tolernace()

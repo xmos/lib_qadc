@@ -68,3 +68,6 @@ def pot_lut_compare(cap_pf, res_pot, res_ser, vrail, vthresh, num_adc, filter_de
 
 def test_pot_lut():
     pot_lut_compare(3000, 47000, 470, 3.3, 1.14, 1, 32, 1024, 1)
+
+if __name__ == "__main__":
+    pot_lut_compare()
