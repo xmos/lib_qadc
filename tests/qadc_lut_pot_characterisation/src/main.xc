@@ -9,12 +9,25 @@
 #include "i2c.h"
 #include "xassert.h"
 
-#define NUM_ADC         2
+#define NUM_ADC         1
 #define LUT_SIZE        1024
-#define FILTER_DEPTH    32
+#define FILTER_DEPTH    4
 #define HYSTERESIS      1
+#define CONVERT_MS      1
 
-on tile[1]: port p_adc[] = {XS1_PORT_1K, XS1_PORT_1L}; // Sets which pins are to be used (channels 0..n)
+
+const unsigned capacitor_pf = 8800;
+const unsigned potentiometer_ohms = 10500; // nominal maximum value ned to end
+const unsigned resistor_series_ohms = 220;
+
+const float v_rail = 3.3;
+const float v_thresh = 1.15;
+const char auto_scale = 1;
+
+const unsigned convert_interval_ticks = (CONVERT_MS * XS1_TIMER_KHZ);
+
+// on tile[1]: port p_adc[] = {XS1_PORT_1K, XS1_PORT_1L}; // Sets which pins are to be used (channels 0..n)
+on tile[1]: port p_adc[] = {XS1_PORT_1L};
 on tile[0]: port p_scl = XS1_PORT_1L;
 on tile[0]: port p_sda = XS1_PORT_1M;
 on tile[0]: out port p_ctrl = XS1_PORT_8D;              /* p_ctrl:
@@ -76,58 +89,63 @@ void control_task(chanend c_adc, client interface i2c_master_if i2c){
 
     delay_milliseconds(100);
 
-
-for(int i=0; i<0x7f; i++){
-    uint8_t bl[1];
-    i2c_res_t r = i2c.read(i, bl, 1, 1); 
-    printf("addr: 0x%x res: %d\n", i, r);
-}
-
+    uint16_t cal_table[1024] = {0};
 
     SetI2CMux(PCA9540B_CTRL_CHAN_0, i2c);
     
     const uint8_t addr = 0x28;
-    unsigned counter = 0;
-    uint8_t config[] = {0x13}; // Convert on V1
+    uint8_t config[] = {0x23}; // Convert on V1
     size_t num_sent;
-    printf("pre\n");
-    i2c.write(addr, config, 1, num_sent, 1); //Write configuration information to ADC
-    // i2c.write_reg(addr, 0x00, config[0]); //Write configuration information to ADC
-    printf("post\n");
+    i2c_res_t r = i2c.write(addr, config, 1, num_sent, 1); //Write configuration information to ADC
 
-    uint8_t data[2] = {0};
+    int running = 1;
 
-
-    while(1){
+    while(running){
+        uint8_t i2c_data[2] = {0};
+        
         uint32_t adc[NUM_ADC];
-        uint32_t adc_dir[NUM_ADC];
 
-        // while(1);
+        delay_ticks(convert_interval_ticks * FILTER_DEPTH * 2);
 
-        printf("Read channel ");
-        for(unsigned ch = 0; ch < NUM_ADC; ch++){
-            c_adc <: (uint32_t)ADC_CMD_READ | ch;
-            c_adc :> adc[ch];
-            c_adc <: (uint32_t)ADC_CMD_POT_GET_DIR | ch;
-            c_adc :> adc_dir[ch];
+        int ch = 0;
+        c_adc <: (uint32_t)ADC_CMD_READ | ch;
+        c_adc :> adc[ch];
 
-            printf("%u: %u (%u), ", ch, adc[ch], adc_dir[ch]);
+        c_adc <: (uint32_t)ADC_CMD_POT_STOP_CONV;
+        delay_milliseconds(5); // Time to read the actual pot voltage
+        r = i2c.read(addr, i2c_data, 2, 1);
+        if(r != I2C_ACK){
+            printf("Ext ADC read error...\n");
         }
-        putchar('\n');
-        delay_milliseconds(100);
+        uint16_t ref_val = (((i2c_data[0] & 0xf) << 8) | i2c_data[1]) >> 2;
+        printf("ref_val: %u conv_val: %u \n", ref_val, adc[ch]);
+        c_adc <: (uint32_t)ADC_CMD_POT_START_CONV;
 
-        // Optionally pause so we can read pot voltage for testing
-        if(counter == 10){
-            printf("Restarting ADC...\n");
-            c_adc <: (uint32_t)ADC_CMD_POT_STOP_CONV;
-            delay_milliseconds(1000); // Time to read the actual pot voltage
-            c_adc <: (uint32_t)ADC_CMD_POT_START_CONV;
-            counter = 0;
-            delay_milliseconds(100);
+        cal_table[ref_val] = adc[ch];
+        delay_milliseconds(1);
+
+        if (ref_val == 1023){
+            running = 0;
         }
-        i2c.read(addr, data, 2, 1);
-        printf("data: 0x%x 0x%x\n", data[0], data[1]);
     }
+
+    printf("Exiting ADC and writing table..\n");
+
+    FILE * movable ct;
+    ct = fopen("cal_table.bin", "wb");
+    fwrite(cal_table, 2, 1024, ct);
+    fclose(move(ct));
+
+    FILE * movable pf;
+    pf = fopen("params.txt", "wt");
+    char string[1024];
+    sprintf(string, "%d_%d_%d_%.2f", capacitor_pf, potentiometer_ohms, resistor_series_ohms, v_thresh);
+    fprintf(pf, "%s\n", string);
+    fclose(move(pf));
+
+    // Close peripherals
+    i2c.shutdown();
+    c_adc <: (uint32_t) ADC_CMD_POT_EXIT;
 }
 
 int main() {
@@ -140,16 +158,6 @@ int main() {
         }
         on tile[1]:{
             chan c_adc;
-
-            const unsigned capacitor_pf = 8800;
-            const unsigned potentiometer_ohms = 10000; // nominal maximum value ned to end
-            const unsigned resistor_series_ohms = 220;
-
-            const float v_rail = 3.3;
-            const float v_thresh = 1.15;
-            const char auto_scale = 1;
-
-            const unsigned convert_interval_ticks = (1 * XS1_TIMER_KHZ);
             
             const adc_pot_config_t adc_config = {capacitor_pf,
                                                 potentiometer_ohms,
@@ -167,6 +175,7 @@ int main() {
                 adc_pot_task(c_adc, p_adc, adc_pot_state);
                 control_task(c_adc, i2c[0]);
             }
+            printf("FINISHED!!\n");
         }
     }
 

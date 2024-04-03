@@ -19,4 +19,5 @@ set(APP_COMPILER_FLAGS  -Os
 
 # Workaround for now until cmake xcommon supports this
 set(XMOS_SANDBOX_DIR ${CMAKE_CURRENT_LIST_DIR}/../../..)
+
 XMOS_REGISTER_APP()

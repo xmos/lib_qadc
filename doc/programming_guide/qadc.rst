@@ -188,6 +188,8 @@ When passive component tolerances are poor we see differing effects on the real-
 
 For the `Rheostat` approach we see the good linearity and zero scale performance is always retained however full scale is directly affected. For example, if the resistor tolerance is 20% too low then the time constant will be smaller than expected and the maximum setting that can be achieved is 80% even at full travel. If the resistor tolerance is 20% too high then full scale will be achieved at 80% travel and the last 20% of travel will give the same reading of full scale. 
 
+The small step close to zero is caused by the QADC not being able to charge the capacitor past the threshold voltage at low setting due to the series resistor.
+
 If a manufacturing test is an option to calibrate the component values then this is likely the best approach to adopt. 
 
 .. _fig_qadc_rheo_tol:
@@ -202,6 +204,9 @@ The `Potentiometer` approach is more tolerant to the overall end to end resistan
 The curve will always remain monotonic increasing however the effect of noise (present in all ADCs) and the use of post processing (filtering and hysteresis)  reduces the real life affect to a couple of percent of the travel, too a point where it may be unnoticeable.
 
 Where the potentiometer end to end resistance is higher than set in the model, flat spot effect will be seen due to a higher than expected RC constant when the potentiometer is near to the GPIO input threshold voltage. Where the potentiometer end to end resistance is lower than set in the model, the inflection effect will be see due to the RC time constant being shorter than expected.
+
+The small steps close to zero and full scale settings are caused by the QADC not being able to charge the capacitor past the threshold voltage due to the potenial divider effect of the series resistor and the potentiometer equivalent series resistance.
+
 
 Overall, it is recommended to use the `Potentiometer` approach in cases where the potentiometer tolerance is up to 20% and a manufacturing test is not practical.
 
@@ -220,6 +225,9 @@ There are three components to consider when building one channel of QADC.
 The variable resistor should be typically in the order of 20 - 50 kOhms. A lower value such as 10k Ohms may be used but it will either reduce the accuracy of the QADC slightly due to the increasing effect of the (required) series resistor and a reduced count or require the inclusion a larger capacitor to compensate which will increase power consumption due to greater charge/discharge amounts. Choosing a value significantly of 100 k Ohms or above may also decrease performance due to PCB parasitics or IO input leakage affecting the accuracy.
 
 The capacitor value should by typically around 2 - 5 nF typically with the same tradeoffs being seen as that of the variable resistor.
+
+The series resistor value is a compromise. Ideally it would set to a low value to reduce the small step effects however this increases the current draw on the IO pin when the slider is close to end settings, which is undesirable. Typically a value of 1% of the variable resistor value is applicable with a minimum being around 330 ohms.
+
 
 
 QADC Potentiometer API
