@@ -182,11 +182,28 @@ Even after filtering it may still be possible to see some small noise signal dep
 Comparing the Effect of Passive Component Tolerance on Both Schemes
 -------------------------------------------------------------------
 
+Both schemes offered will work very well when the overall passive component tolerances are good (e.g. 5%). However typical variable resistors/potentiometers are designed to produce good relative resistances rather than absolute resistances. The QADC relies more on absolute resistances, especially the rheostat approach.
+
+When passive component tolerances are poor we see differing effects on the real-life transfer curves of ``actual position`` to ``estimated position`` depending on the scheme used.
+
+For the `Rheostat` approach we see the good linearity and zero scale performance is always retained however full scale is directly affected. For example, if the resistor tolerance is 20% too low then the time constant will be smaller than expected and the maximum setting that can be achieved is 80% even at full travel. If the resistor tolerance is 20% too high then full scale will be achieved at 80% travel and the last 20% of travel will give the same reading of full scale. 
+
+If a manufacturing test is an option to calibrate the component values then this is likely the best approach to adopt. 
+
 .. _fig_qadc_rheo_tol:
 .. figure:: images/qadc_rheo_tol.png
    :width: 80%
 
    QADC Rehostat Effect of 20% Tolerance
+
+
+The `Potentiometer` approach is more tolerant to the overall end to end resistance since it's operation also relies on the starting potential as well as the equivalent series resistance at any given setting, which itself is a function of the end-end track resistance. Even when tolerance is 20% out the end positions will always achieve zero and full scale however linearity is slightly degraded and a small flat spot or inflection point may be seen at around 1/3 of the travel. 
+
+The curve will always remain monotonic increasing however the effect of noise (present in all ADCs) and the use of post processing (filtering and hysteresis)  reduces the real life affect to a couple of percent of the travel, too a point where it may be unnoticeable.
+
+Where the potentiometer end to end resistance is higher than set in the model, flat spot effect will be seen due to a higher than expected RC constant when the potentiometer is near to the GPIO input threshold voltage. Where the potentiometer end to end resistance is lower than set in the model, the inflection effect will be see due to the RC time constant being shorter than expected.
+
+Overall, it is recommended to use the `Potentiometer` approach in cases where the potentiometer tolerance is up to 20% and a manufacturing test is not practical.
 
 
 .. _fig_qadc_pot_tol:
@@ -200,9 +217,9 @@ Passive Component Selection
 
 There are three components to consider when building one channel of QADC.
 
-The variable resistor should be typically in the order of 20 - 50 kOhms. A lower value such as 10k Ohms may be used but it will either reduce the accuracy of the QADC slightly or require a larger capacitor. Choosing a value significantly of 100 k Ohms or above may also decrease performance due to PCB parasitics or IO input leakage.
+The variable resistor should be typically in the order of 20 - 50 kOhms. A lower value such as 10k Ohms may be used but it will either reduce the accuracy of the QADC slightly due to the increasing effect of the (required) series resistor and a reduced count or require the inclusion a larger capacitor to compensate which will increase power consumption due to greater charge/discharge amounts. Choosing a value significantly of 100 k Ohms or above may also decrease performance due to PCB parasitics or IO input leakage affecting the accuracy.
 
-The capacitor value should by typically around 2 - 5 nF. Decreasing the value will cause the QADC to be  
+The capacitor value should by typically around 2 - 5 nF typically with the same tradeoffs being seen as that of the variable resistor.
 
 
 QADC Potentiometer API

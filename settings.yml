@@ -9,6 +9,6 @@ documentation:
     xscope_fileio:
       doxyfile_path: doc/Doxyfile.inc
   pdfs:
-    doc/01_device:
-      pdf_title: "{{title}} - device documentation"
-      pdf_filename: "{{project}}_device_doc_v{{version}}"
+    doc/programming_guide/qadc:
+      pdf_title: "{{title}} - Programming Guide"
+      pdf_filename: "{{project}}_programming_guide_v{{version}}"
