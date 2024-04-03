@@ -8,7 +8,12 @@ def plot_unsigned_short_array(array, name):
         plt.ylabel('QADC pos')
         plt.title(f'Calibration curve: {params}')
         plt.grid(True)
-        plt.savefig("calib_table.png", dpi=400)
+        filename = "calib_table"
+        percent = name.split("_")[-1].strip()
+        print(percent)
+        filename += "_" + str(percent) + ".png"
+        print(filename)
+        plt.savefig(filename, dpi=400)
     except KeyboardInterrupt:
         print("Plot display interrupted.")
 

@@ -1,6 +1,8 @@
 // Copyright 2024 XMOS LIMITED.
 // This Software is subject to the terms of the XMOS Public Licence: Version 1.
 
+// This setup connects a GPIO slice to the 316 MC board to provide a semi-automated curve
+
 #include <platform.h>
 #include <xs1.h>
 #include <stdio.h>
@@ -9,15 +11,18 @@
 #include "i2c.h"
 #include "xassert.h"
 
-#define NUM_ADC         1
-#define LUT_SIZE        1024
-#define FILTER_DEPTH    4
-#define HYSTERESIS      1
-#define CONVERT_MS      1
-
+#define NUM_ADC             1
+#define LUT_SIZE            1024
+#define FILTER_DEPTH        4
+#define HYSTERESIS          1
+#define CONVERT_MS          1
+#define POT_OHMS_NOMINAL    10500
+#define PERCENT_POT         0 // Set to 0 for perfect R = model
+// Note opposite tolerance value because we are simulating the physical pot changing not model
+#define POT_OHMS (unsigned) (float)(100 - PERCENT_POT) * POT_OHMS_NOMINAL / 100.0
 
 const unsigned capacitor_pf = 8800;
-const unsigned potentiometer_ohms = 10500; // nominal maximum value ned to end
+const unsigned potentiometer_ohms = POT_OHMS;
 const unsigned resistor_series_ohms = 220;
 
 const float v_rail = 3.3;
@@ -96,7 +101,7 @@ void control_task(chanend c_adc, client interface i2c_master_if i2c){
     const uint8_t addr = 0x28;
     uint8_t config[] = {0x23}; // Convert on V1
     size_t num_sent;
-    i2c_res_t r = i2c.write(addr, config, 1, num_sent, 1); //Write configuration information to ADC
+    i2c_res_t r = i2c.write(addr, config, 1, num_sent, 1); //Write configuration information to ADC for calib
 
     int running = 1;
 
@@ -129,7 +134,7 @@ void control_task(chanend c_adc, client interface i2c_master_if i2c){
         }
     }
 
-    printf("Exiting ADC and writing table..\n");
+    printf("Exiting ADC and writing table.. Model pot ohms: %u\n", potentiometer_ohms);
 
     FILE * movable ct;
     ct = fopen("cal_table.bin", "wb");
@@ -139,7 +144,7 @@ void control_task(chanend c_adc, client interface i2c_master_if i2c){
     FILE * movable pf;
     pf = fopen("params.txt", "wt");
     char string[1024];
-    sprintf(string, "%d_%d_%d_%.2f", capacitor_pf, potentiometer_ohms, resistor_series_ohms, v_thresh);
+    sprintf(string, "%d_%d_%d_%.2f_%d", capacitor_pf, POT_OHMS_NOMINAL, resistor_series_ohms, v_thresh, PERCENT_POT);
     fprintf(pf, "%s\n", string);
     fclose(move(pf));
 

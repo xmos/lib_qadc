@@ -396,7 +396,6 @@ void adc_pot_task(chanend c_adc, port p_adc[], adc_pot_state_t &adc_pot_state){
                         time_trigger_charge += max_charge_period_ticks; // start in one conversion period
                         // Clear all history apart from scaling
                         memset(adc_pot_state.results, 0, adc_pot_state.max_seen_ticks_up - adc_pot_state.results);
-                        printstrln("restart");
                         adc_state = ADC_IDLE;
                     break;
                     case ADC_CMD_POT_EXIT:
