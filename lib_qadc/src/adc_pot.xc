@@ -201,7 +201,7 @@ void adc_pot_task(chanend c_adc, port p_adc[], adc_pot_state_t &adc_pot_state){
     timer tmr_overshoot;
 
     // Set all ports to input and set drive strength
-    const int port_drive = DRIVE_4MA;
+    const int port_drive = DRIVE_2MA;
     for(int i = 0; i < adc_pot_state.num_adc; i++){
         unsigned dummy;
         p_adc[i] :> dummy;
