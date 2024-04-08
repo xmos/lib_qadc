@@ -206,7 +206,7 @@ void adc_pot_task(chanend c_adc, port p_adc[], adc_pot_state_t &adc_pot_state){
         unsigned dummy;
         p_adc[i] :> dummy;
         // Simulator doesn't like setc
-        if(!isSimulation()) set_pad_properties(p_adc[i], port_drive, PULL_NONE, 0, 0);
+        if(!isSimulation()) set_pad_properties(p_adc[i], port_drive, PULL_NONE, 1, 0);
 
     }
 
