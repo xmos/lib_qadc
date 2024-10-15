@@ -40,7 +40,7 @@ pipeline {
   stages {
     stage("QADC pipeline") {
       agent {
-        abel 'x86_64 && linux'
+        label 'x86_64 && linux'
       }
 
       stages {
