@@ -325,16 +325,8 @@ void do_adc_handle_overshoot(port p_adc[], unsigned adc_idx, adc_pot_state_t &ad
     }
 }
 
-void adc_pot_task(chanend c_adc, port p_adc[], adc_pot_state_t &adc_pot_state){
-    dprintf("adc_pot_task\n");
-  
-    // Current conversion index
-    unsigned adc_idx = 0;
 
-    timer tmr_charge;
-    timer tmr_discharge;
-    timer tmr_overshoot;
-
+void adc_pot_startup(port p_adc[], adc_pot_state_t &adc_pot_state, pot_timings_t &pot_timings){
     // Set all ports to input and set drive strength
     const int port_drive = DRIVE_2MA;
     for(int i = 0; i < adc_pot_state.num_adc; i++){
@@ -345,11 +337,10 @@ void adc_pot_task(chanend c_adc, port p_adc[], adc_pot_state_t &adc_pot_state){
 
     }
 
+
+    // Work out timing limits
     const unsigned capacitor_pf = adc_pot_state.adc_config.capacitor_pf;
     const unsigned potentiometer_ohms = adc_pot_state.adc_config.potentiometer_ohms;
-
-    pot_timings_t pot_timings = {0};
-
     const int rc_times_to_charge_fully = 5; // 5 RC times should be sufficient to reach rail
     pot_timings.max_charge_period_ticks = ((uint64_t)rc_times_to_charge_fully * capacitor_pf * potentiometer_ohms / 4) / 10000;
 
@@ -360,6 +351,25 @@ void adc_pot_task(chanend c_adc, port p_adc[], adc_pot_state_t &adc_pot_state){
     dprintf("max_charge_period_ticks: %lu max_dis_period_ticks (up/down): (%lu,%lu), crossover_idx: %u\n",
             max_charge_period_ticks, adc_pot_state.max_lut_ticks_up, adc_pot_state.max_lut_ticks_down, adc_pot_state.crossover_idx);
     assert(adc_pot_state.adc_config.convert_interval_ticks > pot_timings.max_charge_period_ticks + pot_timings.max_discharge_period_ticks * 2); // Ensure conversion rate is low enough. *2 to allow post processing time
+
+}
+
+void adc_pot_task(chanend c_adc, port p_adc[], adc_pot_state_t &adc_pot_state){
+    dprintf("adc_pot_task\n");
+  
+    // Current conversion index
+    unsigned adc_idx = 0;
+
+    // State timers
+    timer tmr_charge;
+    timer tmr_discharge;
+    timer tmr_overshoot;
+
+    // Timing struct
+    pot_timings_t pot_timings = {0};
+
+    adc_pot_startup(p_adc, adc_pot_state, pot_timings);
+
 
     // Setup initial state
     adc_state_t adc_state = ADC_IDLE;
