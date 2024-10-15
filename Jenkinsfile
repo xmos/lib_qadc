@@ -81,13 +81,9 @@ pipeline {
             dir("${REPO}") {
               withVenv {
                 warnError("Docs") {
-                  buildDocs("${REPO}")
+                  buildDocs()
                 }
               }
-              // Zip and archive doc files
-              zip dir: "doc/_build/html", zipFile: "${REPO}_docs_html.zip"
-              archiveArtifacts artifacts: "${REPO}_docs_html.zip", allowEmptyArchive: true
-              archiveArtifacts artifacts: "doc/_build/pdf/*.pdf", allowEmptyArchive: true
             }
           }
         } // stage: Docs
