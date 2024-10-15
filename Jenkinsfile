@@ -50,7 +50,9 @@ pipeline {
           steps {
             dir("${REPO}") {
               withTools(params.TOOLS_VERSION) {
-                sh "cmake -G 'Unix Makefiles' -B build"
+                dir("examples"){
+                  sh "cmake -G 'Unix Makefiles' -B build"
+                }
                 createVenv("requirements.txt")
                 withVenv {
                   sh "pip install -r requirements.txt"
@@ -77,8 +79,10 @@ pipeline {
         stage('Docs') {
           steps {
             dir("${REPO}") {
-              warnError("Docs") {
-                buildDocs()
+              withVenv {
+                warnError("Docs") {
+                  buildDocs()
+                }
               }
             }
           }
