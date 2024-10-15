@@ -53,16 +53,12 @@ void adc_pot_single_example(port p_adc[], adc_pot_state_t &adc_pot_state){
         uint32_t adc[NUM_ADC];
         uint32_t adc_dir[NUM_ADC];
 
-        printf("Read channel ");
+        printf("Read ADC ");
         for(unsigned ch = 0; ch < NUM_ADC; ch++){
             adc[ch] = adc_pot_single(p_adc, ch, adc_pot_state);
-        
-
             printf("%u: %u (%u), ", ch, adc[ch], adc_dir[ch]);
         }
         putchar('\n');
-        delay_milliseconds(100);
-
         delay_milliseconds(100);
     }
 

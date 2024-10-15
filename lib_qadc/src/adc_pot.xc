@@ -306,9 +306,10 @@ void do_adc_handle_overshoot(port p_adc[], unsigned adc_idx, adc_pot_state_t &ad
         uint16_t result = adc_pot_state.crossover_idx + (is_up != 0 ? 1 : 0);
         uint16_t post_proc_result = post_process_result(result, adc_pot_state.conversion_history, adc_pot_state.hysteris_tracker, adc_idx, adc_pot_state.num_adc, adc_pot_state.filter_depth, adc_pot_state.lut_size, adc_pot_state.result_hysteresis);
         adc_pot_state.results[adc_idx] = post_proc_result;
+
+        printf("result: %u ch: %u overshoot (ticks>%d) val:%u\n", post_proc_result, adc_idx, pot_timings.time_trigger_overshoot-pot_timings.time_trigger_discharge, overshoot_port_val);
     }
 
-    dprintf("result: %u overshoot (ticks>%d) val:%u\n", result, pot_timings.time_trigger_overshoot-pot_timings.time_trigger_discharge, overshoot_port_val);
 
     if(++adc_idx == adc_pot_state.num_adc){
         adc_idx = 0;
@@ -448,6 +449,7 @@ uint16_t adc_pot_single(port p_adc[], unsigned adc_idx, adc_pot_state_t &adc_pot
 
     pot_timings_t pot_timings = {0};
     adc_pot_startup(p_adc, adc_pot_state, pot_timings);
+
     do_adc_charge(p_adc, adc_idx, adc_pot_state, pot_timings);
     delay_ticks(pot_timings.max_charge_period_ticks);
     do_adc_start_convert(p_adc, adc_idx, adc_pot_state, pot_timings);
@@ -458,9 +460,11 @@ uint16_t adc_pot_single(port p_adc[], unsigned adc_idx, adc_pot_state_t &adc_pot
         select{
             case p_adc[adc_idx] when pinseq(adc_pot_state.init_port_val[adc_idx]) :> int _ @ pot_timings.end_time:
                 do_adc_convert(p_adc, adc_idx, adc_pot_state, pot_timings);
+                printstrln("cv");
             break;
             case tmr_overshoot when timerafter(pot_timings.time_trigger_overshoot) :> int _:
                 do_adc_handle_overshoot(p_adc, adc_idx, adc_pot_state, pot_timings);
+                printstrln("os");
             break;
         }
         result = adc_pot_state.results[adc_idx];
