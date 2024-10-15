@@ -81,7 +81,7 @@ pipeline {
             dir("${REPO}") {
               withVenv {
                 warnError("Docs") {
-                  buildDocs()
+                  buildDocs("${REPO}")
                 }
               }
               // Zip and archive doc files
