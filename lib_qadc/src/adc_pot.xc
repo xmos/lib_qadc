@@ -152,17 +152,15 @@ static inline uint16_t post_process_result( uint16_t raw_result,
                                             size_t lookup_size,
                                             unsigned result_hysteresis){
     unsafe{
-        static unsigned filter_write_idx = 0;
-        static unsigned filter_stable = 0;
+        static unsigned filter_write_idx[4] = {0};
+
 
         // Apply filter. First populate filter history.
-        unsigned offset = adc_idx * result_history_depth + filter_write_idx;
+        unsigned offset = adc_idx * result_history_depth + filter_write_idx[adc_idx];
         *(conversion_history + offset) = raw_result;
-        if(adc_idx == num_adc - 1){
-            if(++filter_write_idx == result_history_depth){
-                filter_write_idx = 0;
-                filter_stable = 1;
-            }
+
+        if(++filter_write_idx[adc_idx] == result_history_depth){
+            filter_write_idx[adc_idx] = 0;
         }
 
         // Apply moving average filter
@@ -173,6 +171,7 @@ static inline uint16_t post_process_result( uint16_t raw_result,
             hist_ptr++;
         }
         uint16_t filtered_result = (accum / result_history_depth);
+
 
         // Apply hysteresis
         if(filtered_result > hysteris_tracker[adc_idx] + result_hysteresis || filtered_result == (lookup_size - 1)){
@@ -201,7 +200,7 @@ typedef struct pot_timings_t{
     int16_t end_time;
 }pot_timings_t;
 
-void do_adc_charge(port p_adc[], unsigned adc_idx, adc_pot_state_t & adc_pot_state, pot_timings_t &pot_timings){
+void do_adc_charge(port p_adc[], unsigned adc_idx, adc_pot_state_t &adc_pot_state, pot_timings_t &pot_timings){
     unsafe{
         p_adc[adc_idx] :> adc_pot_state.init_port_val[adc_idx];
         unsigned is_up = adc_pot_state.init_port_val[adc_idx];
@@ -216,15 +215,87 @@ void do_adc_charge(port p_adc[], unsigned adc_idx, adc_pot_state_t & adc_pot_sta
     }
 }
 
-void do_adc_start_convert(port p_adc[], unsigned adc_idx, adc_pot_state_t & adc_pot_state, pot_timings_t &pot_timings){
+void do_adc_start_convert(port p_adc[], unsigned adc_idx, adc_pot_state_t &adc_pot_state, pot_timings_t &pot_timings){
     p_adc[adc_idx] :> int _ @ pot_timings.start_time; // Make Hi Z and grab port time
     // Set up an event to handle if port doesn't reach oppositie value. Set at double the max expected time. This is a fairly fatal 
     // event which is caused by severe mismatch of hardware vs init params
     pot_timings.time_trigger_overshoot = pot_timings.time_trigger_discharge + (pot_timings.max_ticks_expected * 2);
 }
 
-void do_adc_convert(port p_adc[], unsigned adc_idx, adc_pot_state_t & adc_pot_state, pot_timings_t &pot_timings){
-    
+void do_adc_convert(port p_adc[], unsigned adc_idx, adc_pot_state_t &adc_pot_state, pot_timings_t &pot_timings){
+    unsafe{
+        int32_t conversion_time = (pot_timings.end_time - pot_timings.start_time);
+        if(conversion_time < 0){
+            conversion_time += 0x10000; // Account for port timer wrapping
+        }
+
+        // Update max seen values. Can help tracking if actual RC constant is less than expected.
+        unsigned is_up = adc_pot_state.init_port_val[adc_idx];
+        if(is_up) unsafe{
+            if(conversion_time > adc_pot_state.max_seen_ticks_up[adc_idx]){
+                adc_pot_state.max_seen_ticks_up[adc_idx] = conversion_time;
+            }
+        } else unsafe{
+            if(conversion_time > adc_pot_state.max_seen_ticks_down[adc_idx]){
+                adc_pot_state.max_seen_ticks_down[adc_idx] = conversion_time;
+            }
+        }
+
+        // Check for soft overshoot. This is when the actual RC constant is greater than expected and is expected.
+        if(conversion_time > pot_timings.max_ticks_expected){
+            dprintf("soft overshoot: %d (%d)\n", conversion_time, pot_timings.max_ticks_expected);
+            if(adc_pot_state.adc_config.auto_scale){
+                if(is_up){ // is up
+                    q3_13_fixed_t new_scale = ((uint32_t)adc_pot_state.max_scale_up[adc_idx] * (uint32_t)conversion_time) / (uint32_t)pot_timings.max_ticks_expected;
+                    dprintf("up scale: %d (%d)\n", adc_pot_state.max_scale_up[adc_idx], new_scale);
+                    adc_pot_state.max_scale_up[adc_idx] = new_scale;
+                } else {
+                    q3_13_fixed_t new_scale = ((uint32_t)adc_pot_state.max_scale_down[adc_idx] * (uint32_t)conversion_time) / (uint32_t)pot_timings.max_ticks_expected;
+                    dprintf("down scale: %d (%d)\n", adc_pot_state.max_scale_down[adc_idx], new_scale);
+                    adc_pot_state.max_scale_down[adc_idx] = new_scale;
+                }                             
+            }
+        }
+
+        // Check for minimum setting being smaller than port time offset (sets zero and full scale). Minimum time to trigger port select. 
+        if(conversion_time < adc_pot_state.port_time_offset){
+            dprintf("Port offset: %lu %lu\n", conversion_time, adc_pot_state.port_time_offset);
+            if(adc_pot_state.adc_config.auto_scale){
+                adc_pot_state.port_time_offset = conversion_time;
+            }
+        }
+
+        // Turn time and direction into ADC reading
+        uint16_t result = ticks_to_position(is_up,
+                                            conversion_time,
+                                            adc_pot_state.cal_up,
+                                            adc_pot_state.cal_down,
+                                            adc_pot_state.lut_size,
+                                            adc_pot_state.port_time_offset,
+                                            adc_pot_state.max_scale_up[adc_idx],
+                                            adc_pot_state.max_scale_down[adc_idx]);
+        uint16_t post_proc_result = post_process_result(result,
+                                                        adc_pot_state.conversion_history,
+                                                        adc_pot_state.hysteris_tracker,
+                                                        adc_idx, adc_pot_state.num_adc,
+                                                        adc_pot_state.filter_depth,
+                                                        adc_pot_state.lut_size,
+                                                        adc_pot_state.result_hysteresis);
+        adc_pot_state.results[adc_idx] = post_proc_result;
+        dprintf("result: %u post_proc: %u ticks: %u is_up: %d mu: %lu md: %lu\n",
+            result, post_proc_result, conversion_time, is_up, adc_pot_state.max_seen_ticks_up[adc_idx], adc_pot_state.max_seen_ticks_down[adc_idx]);
+
+        if(++adc_idx == adc_pot_state.num_adc){
+            adc_idx = 0;
+        }
+        pot_timings.time_trigger_charge += adc_pot_state.adc_config.convert_interval_ticks;
+        int32_t time_now;
+        timer tmr;
+        tmr :> time_now;
+        if(timeafter(time_now, pot_timings.time_trigger_charge)){
+            dprintf("Error - Conversion time to short\n");
+        }
+    }
 }
 
 
@@ -286,85 +357,8 @@ void adc_pot_task(chanend c_adc, port p_adc[], adc_pot_state_t &adc_pot_state){
             break;
 
             case adc_state == ADC_CONVERTING => p_adc[adc_idx] when pinseq(adc_pot_state.init_port_val[adc_idx]) :> int _ @ pot_timings.end_time:
-                unsafe{
-                    int32_t conversion_time = (pot_timings.end_time - pot_timings.start_time);
-                    if(conversion_time < 0){
-                        conversion_time += 0x10000; // Account for port timer wrapping
-                    }
-
-                    // Update max seen values. Can help tracking if actual RC constant is less than expected.
-                    unsigned is_up = adc_pot_state.init_port_val[adc_idx];
-                    if(is_up) unsafe{
-                        if(conversion_time > adc_pot_state.max_seen_ticks_up[adc_idx]){
-                            adc_pot_state.max_seen_ticks_up[adc_idx] = conversion_time;
-                        }
-                    } else unsafe{
-                        if(conversion_time > adc_pot_state.max_seen_ticks_down[adc_idx]){
-                            adc_pot_state.max_seen_ticks_down[adc_idx] = conversion_time;
-                        }
-                    }
-
-                    // Check for soft overshoot. This is when the actual RC constant is greater than expected and is expected.
-                    if(conversion_time > pot_timings.max_ticks_expected){
-                        dprintf("soft overshoot: %d (%d)\n", conversion_time, pot_timings.max_ticks_expected);
-                        if(adc_pot_state.adc_config.auto_scale){
-                            if(is_up){ // is up
-                                q3_13_fixed_t new_scale = ((uint32_t)adc_pot_state.max_scale_up[adc_idx] * (uint32_t)conversion_time) / (uint32_t)pot_timings.max_ticks_expected;
-                                dprintf("up scale: %d (%d)\n", adc_pot_state.max_scale_up[adc_idx], new_scale);
-                                adc_pot_state.max_scale_up[adc_idx] = new_scale;
-                            } else {
-                                q3_13_fixed_t new_scale = ((uint32_t)adc_pot_state.max_scale_down[adc_idx] * (uint32_t)conversion_time) / (uint32_t)pot_timings.max_ticks_expected;
-                                dprintf("down scale: %d (%d)\n", adc_pot_state.max_scale_down[adc_idx], new_scale);
-                                adc_pot_state.max_scale_down[adc_idx] = new_scale;
-                            }                             
-                        }
-                    }
-
-                    // Check for minimum setting being smaller than port time offset (sets zero and full scale). Minimum time to trigger port select. 
-                    if(conversion_time < adc_pot_state.port_time_offset){
-                        dprintf("Port offset: %lu %lu\n", conversion_time, adc_pot_state.port_time_offset);
-                        if(adc_pot_state.adc_config.auto_scale){
-                            adc_pot_state.port_time_offset = conversion_time;
-                        }
-                    }
-                    
-                    // Keep track of timing (DEBUG only)
-                    int t0, t1;
-                    tmr_charge :> t0; 
-
-                    // Turn time and direction into ADC reading
-                    uint16_t result = ticks_to_position(is_up,
-                                                        conversion_time,
-                                                        adc_pot_state.cal_up,
-                                                        adc_pot_state.cal_down,
-                                                        adc_pot_state.lut_size,
-                                                        adc_pot_state.port_time_offset,
-                                                        adc_pot_state.max_scale_up[adc_idx],
-                                                        adc_pot_state.max_scale_down[adc_idx]);
-                    uint16_t post_proc_result = post_process_result(result,
-                                                                    adc_pot_state.conversion_history,
-                                                                    adc_pot_state.hysteris_tracker,
-                                                                    adc_idx, adc_pot_state.num_adc,
-                                                                    adc_pot_state.filter_depth,
-                                                                    adc_pot_state.lut_size,
-                                                                    adc_pot_state.result_hysteresis);
-                    adc_pot_state.results[adc_idx] = post_proc_result;
-                    tmr_charge :> t1; 
-                    dprintf("result: %u post_proc: %u ticks: %u is_up: %d proc_ticks: %d mu: %lu md: %lu\n",
-                        result, post_proc_result, conversion_time, is_up, t1-t0, adc_pot_state.max_seen_ticks_up[adc_idx], adc_pot_state.max_seen_ticks_down[adc_idx]);
-
-                    if(++adc_idx == adc_pot_state.num_adc){
-                        adc_idx = 0;
-                    }
-                    pot_timings.time_trigger_charge += adc_pot_state.adc_config.convert_interval_ticks;
-                    int32_t time_now;
-                    tmr_charge :> time_now;
-                    if(timeafter(time_now, pot_timings.time_trigger_charge)){
-                        dprintf("Error - Conversion time to short\n");
-                    }
-
-                    adc_state = ADC_IDLE;
-                }
+                do_adc_convert(p_adc, adc_idx, adc_pot_state, pot_timings);
+                adc_state = ADC_IDLE;
             break;
 
             // This case happens if the hardware RC constant is much higher than expected
