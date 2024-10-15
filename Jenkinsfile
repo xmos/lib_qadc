@@ -12,28 +12,35 @@ getApproval()
 
 pipeline {
   agent none
-  parameters {
-    string(
-      name: 'TOOLS_VERSION',
-      defaultValue: '15.3.0',
-      description: 'The tools version to build with (check /projects/tools/ReleasesTools/)'
-    )
-  } // parameters
   environment {
     REPO = 'lib_qadc'
-    PIP_VERSION = "24.0"
-    PYTHON_VERSION = "3.11"
-    XMOSDOC_VERSION = "v6.1.2"          
   } // env
+  parameters {
+    string(
+    name: 'TOOLS_VERSION',
+    defaultValue: '15.3.0',
+    description: 'The XTC tools version'
+    )
+    string(
+    name: 'XMOSDOC_VERSION',
+    defaultValue: 'v6.1.2',
+    description: 'The xmosdoc version'
+    )
+    string(
+    name: 'INFR_APPS_VERSION',
+    defaultValue: 'v2.0.1',
+    description: 'The infr_apps version'
+    )
+  }
   options {
     skipDefaultCheckout()
     timestamps()
     buildDiscarder(xmosDiscardBuildSettings(onlyArtifacts=false))
   } // options
   stages {
-    stage('xcore.ai') {
+    stage("QADC pipeline") {
       agent {
-        label 'xcore.ai' // xcore.ai nodes have 2 devices atatched, allowing parallel HW test
+        label 'x86_64 && linux'
       }
 
       stages {
@@ -65,12 +72,8 @@ pipeline {
           steps {
             dir("${REPO}") {
               withVenv {
-                warnError("Flake") {
-                  sh "flake8 --exit-zero --output-file=flake8.xml lib_qadc"
-                  recordIssues enabledForFailure: true, tool: flake8(pattern: 'flake8.xml')
-                }
                 warnError("Lib checks") {
-                  runLibraryChecks("${WORKSPACE}/${REPO}", "v2.0.1")
+                  runLibraryChecks("${WORKSPACE}/${REPO}", "${params.INFR_APPS_VERSION}")
                 }
               }
             }
@@ -81,13 +84,9 @@ pipeline {
             dir("${REPO}") {
               withVenv {
                 warnError("Docs") {
-                  buildDocs("${REPO}")
+                  buildDocs()
                 }
               }
-              // Zip and archive doc files
-              zip dir: "doc/_build/html", zipFile: "${REPO}_docs_html.zip"
-              archiveArtifacts artifacts: "${REPO}_docs_html.zip", allowEmptyArchive: true
-              archiveArtifacts artifacts: "doc/_build/pdf/*.pdf", allowEmptyArchive: true
             }
           }
         } // stage: Docs
