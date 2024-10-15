@@ -1,4 +1,4 @@
-@Library('xmos_jenkins_shared_library@v0.28.0')
+@Library('xmos_jenkins_shared_library@v0.34.0')
 
 def runningOn(machine) {
   println "Stage running on:"
@@ -12,14 +12,6 @@ def buildApps(appList) {
   }
 }
 
-def buildDocs(String zipFileName) {
-  withVenv {
-    sh 'pip install git+ssh://git@github.com/xmos/xmosdoc'
-    sh 'xmosdoc'
-    zip zipFile: zipFileName, archive: true, dir: "doc/_build"
-  }
-}
-
 
 getApproval()
 
@@ -28,10 +20,16 @@ pipeline {
   parameters {
     string(
       name: 'TOOLS_VERSION',
-      defaultValue: '15.2.1',
+      defaultValue: '15.3.0',
       description: 'The tools version to build with (check /projects/tools/ReleasesTools/)'
     )
   } // parameters
+  environment {
+    REPO = 'lib_qadc'
+    PIP_VERSION = "24.0"
+    PYTHON_VERSION = "3.11"
+    XMOSDOC_VERSION = "v6.1.2"          
+  } // env
   options {
     skipDefaultCheckout()
     timestamps()
@@ -47,7 +45,7 @@ pipeline {
         stage('Checkout') {
           steps {
             runningOn(env.NODE_NAME)
-            dir('lib_qadc') {
+            dir("${REPO}") {
                 checkout scm
             } // dir
           } // steps
@@ -55,7 +53,7 @@ pipeline {
 
         stage('Install Dependencies') {
           steps {
-            dir('lib_qadc') {
+            dir("${REPO}") {
               withTools(params.TOOLS_VERSION) {
                 createVenv("requirements.txt")
                 withVenv {
@@ -67,11 +65,14 @@ pipeline {
         }
         stage('Static analysis') {
           steps {
-            dir('lib_qadc') {
+            dir("${REPO}") {
               withVenv {
                 warnError("Flake") {
                   sh "flake8 --exit-zero --output-file=flake8.xml lib_qadc"
                   recordIssues enabledForFailure: true, tool: flake8(pattern: 'flake8.xml')
+                }
+                warnError("Lib checks") {
+                  runLibraryChecks("${WORKSPACE}/${REPO}", "v2.0.1")
                 }
               }
             }
@@ -80,7 +81,7 @@ pipeline {
         stage('Build') {
           steps {
             sh "git clone -b develop git@github.com:xmos/xcommon_cmake ${WORKSPACE}/xcommon_cmake"
-            dir('lib_qadc/examples') {
+            dir("${REPO}/example") {
               withTools(params.TOOLS_VERSION) {
                 withEnv(["XMOS_CMAKE_PATH=${WORKSPACE}/xcommon_cmake"]) {
                   dir("pot_reader"){
@@ -100,7 +101,7 @@ pipeline {
         } // stage 'Build'
         stage('Tests') {
           steps { 
-            dir('lib_qadc/tests') {
+            dir("${REPO}/tests") {
               withEnv(["XMOS_CMAKE_PATH=${WORKSPACE}/xcommon_cmake"]) {
                 withVenv {
                   withTools(params.TOOLS_VERSION) {
@@ -132,7 +133,7 @@ pipeline {
       }
       steps {
         runningOn(env.NODE_NAME)
-        dir('lib_qadc') {
+        dir("${REPO}") {
           checkout scm
           createVenv("requirements.txt")
           withTools(params.TOOLS_VERSION) {

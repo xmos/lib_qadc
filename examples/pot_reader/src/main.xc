@@ -12,7 +12,7 @@
 #define FILTER_DEPTH    32
 #define HYSTERESIS      1
 
-on tile[1]: port p_adc[] = {XS1_PORT_1K, XS1_PORT_1L}; // Sets which pins are to be used (channels 0..n)
+on tile[1]: port p_adc[] = {XS1_PORT_1M, XS1_PORT_1O}; // Sets which pins are to be used (channels 0..n) X1D36/38
 
 
 void control_task(chanend c_adc){
@@ -21,8 +21,6 @@ void control_task(chanend c_adc){
     while(1){
         uint32_t adc[NUM_ADC];
         uint32_t adc_dir[NUM_ADC];
-
-        // while(1);
 
         printf("Read channel ");
         for(unsigned ch = 0; ch < NUM_ADC; ch++){
@@ -76,6 +74,7 @@ int main() {
 
             uint16_t state_buffer[ADC_POT_STATE_SIZE(NUM_ADC, LUT_SIZE, FILTER_DEPTH)];
             adc_pot_init(NUM_ADC, LUT_SIZE, FILTER_DEPTH, HYSTERESIS, state_buffer, adc_config, adc_pot_state);
+
             par
             {
                 adc_pot_task(c_adc, p_adc, adc_pot_state);
