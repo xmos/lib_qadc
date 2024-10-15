@@ -46,12 +46,17 @@ void control_task(chanend c_adc){
     }
 }
 
-// extern float find_threshold_level(float v_rail, port p);
+void adc_pot_single_example(port p_adc[], adc_pot_state_t &adc_pot_state){
+    printf("Hello!\n");
+
+}
+
 
 int main() {
     par{
         on tile[1]:{
-            chan c_adc;
+            printf("Running QADC Pot reader. API = %s\n", CONTINUOUS == 1 ? "CONTINUOUS" : "SINGLE");
+
 
             const unsigned capacitor_pf = 8800;
             const unsigned potentiometer_ohms = 10000; // nominal maximum value ned to end
@@ -75,11 +80,17 @@ int main() {
             uint16_t state_buffer[ADC_POT_STATE_SIZE(NUM_ADC, LUT_SIZE, FILTER_DEPTH)];
             adc_pot_init(NUM_ADC, LUT_SIZE, FILTER_DEPTH, HYSTERESIS, state_buffer, adc_config, adc_pot_state);
 
+#if (CONTINUOUS == 1)
+            chan c_adc;
+
             par
             {
                 adc_pot_task(c_adc, p_adc, adc_pot_state);
                 control_task(c_adc);
             }
+#else
+            adc_pot_single_example(p_adc, adc_pot_state);
+#endif
         }
     }
 

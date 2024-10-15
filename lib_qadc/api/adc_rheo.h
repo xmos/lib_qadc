@@ -65,9 +65,11 @@ typedef struct adc_rheo_state_t{
 #define ADC_CMD_EXIT                0x07000000ULL
 #define ADC_CMD_MASK                0xff000000ULL
 
+
+void adc_rheo_init(size_t num_adc, size_t adc_steps, size_t filter_depth, unsigned result_hysteresis, uint16_t *state_buffer, adc_rheo_config_t adc_config, adc_rheo_state_t &adc_rheo_state);
+// uint32_t adc_rheo_single()
 #ifdef __XC__
 void adc_rheo_task(chanend c_adc, port p_adc[], adc_rheo_state_t &adc_rheo_state);
-void adc_rheo_init(size_t num_adc, size_t adc_steps, size_t filter_depth, unsigned result_hysteresis, uint16_t *state_buffer, adc_rheo_config_t adc_config, adc_rheo_state_t &adc_rheo_state);
 #else
 DECLARE_JOB(adc_task, (chanend_t, port_t[], size_t));
 void adc_rheo_task(chanend_t c_adc, port_t p_adc[], size_t num_adc, adc_rheo_state_t adc_rheo_state);
