@@ -7,8 +7,8 @@ lib_qadc change log
   * ADDED: Takless single shot API
   * CHANGED: Added documentation
 
-
 0.0.1
 -----
 
   * Initial Version
+
