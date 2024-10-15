@@ -5,13 +5,6 @@ def runningOn(machine) {
   println machine
 }
 
-def buildApps(appList) {
-  appList.each { app ->
-    sh "cmake -G 'Unix Makefiles' -B build"
-    sh "xmake -C build -j\$(nproc)"
-  }
-}
-
 
 getApproval()
 
@@ -80,21 +73,10 @@ pipeline {
         }
         stage('Build') {
           steps {
-            sh "git clone -b develop git@github.com:xmos/xcommon_cmake ${WORKSPACE}/xcommon_cmake"
-            dir("${REPO}/example") {
+            dir("${REPO}/examples") {
               withTools(params.TOOLS_VERSION) {
-                withEnv(["XMOS_CMAKE_PATH=${WORKSPACE}/xcommon_cmake"]) {
-                  dir("pot_reader"){
-                    buildApps([
-                      "qadc_pot_example"
-                    ]) // buildApps
-                  } // dir
-                  dir("rheo_reader"){
-                    buildApps([
-                      "qadc_rheo_example"
-                    ]) // buildApps
-                  } // dir
-                } // withEnv
+                sh "cmake -G 'Unix Makefiles' -B build"
+                sh "xmake -C build -j 8"
               } // withTools
             } // dir
           } // steps
