@@ -78,7 +78,7 @@ typedef struct adc_pot_state_t{
 
 
 void adc_pot_init(size_t num_adc, size_t lut_size, size_t filter_depth, unsigned result_hysteresis, uint16_t *state_buffer, adc_pot_config_t adc_config, adc_pot_state_t &adc_pot_state);
-uint32_t adc_pot_single(port p_adc[], adc_pot_state_t &adc_pot_state);
+uint16_t adc_pot_single(port p_adc[], unsigned ad_idx, adc_pot_state_t &adc_pot_state);
 
 #ifdef __XC__
 void adc_pot_task(chanend c_adc, port p_adc[], adc_pot_state_t &adc_pot_state);

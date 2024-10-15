@@ -9,7 +9,7 @@
 
 #define NUM_ADC         2
 #define LUT_SIZE        1024
-#define FILTER_DEPTH    32
+#define FILTER_DEPTH    8
 #define HYSTERESIS      1
 
 on tile[1]: port p_adc[] = {XS1_PORT_1M, XS1_PORT_1O}; // Sets which pins are to be used (channels 0..n) X1D36/38
@@ -48,6 +48,23 @@ void control_task(chanend c_adc){
 
 void adc_pot_single_example(port p_adc[], adc_pot_state_t &adc_pot_state){
     printf("Hello!\n");
+
+    while(1){
+        uint32_t adc[NUM_ADC];
+        uint32_t adc_dir[NUM_ADC];
+
+        printf("Read channel ");
+        for(unsigned ch = 0; ch < NUM_ADC; ch++){
+            adc[ch] = adc_pot_single(p_adc, ch, adc_pot_state);
+        
+
+            printf("%u: %u (%u), ", ch, adc[ch], adc_dir[ch]);
+        }
+        putchar('\n');
+        delay_milliseconds(100);
+
+        delay_milliseconds(100);
+    }
 
 }
 

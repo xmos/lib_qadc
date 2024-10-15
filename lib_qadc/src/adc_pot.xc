@@ -285,9 +285,7 @@ void do_adc_convert(port p_adc[], unsigned adc_idx, adc_pot_state_t &adc_pot_sta
         dprintf("result: %u post_proc: %u ticks: %u is_up: %d mu: %lu md: %lu\n",
             result, post_proc_result, conversion_time, is_up, adc_pot_state.max_seen_ticks_up[adc_idx], adc_pot_state.max_seen_ticks_down[adc_idx]);
 
-        if(++adc_idx == adc_pot_state.num_adc){
-            adc_idx = 0;
-        }
+
         pot_timings.time_trigger_charge += adc_pot_state.adc_config.convert_interval_ticks;
         int32_t time_now;
         timer tmr;
@@ -376,7 +374,7 @@ void adc_pot_task(chanend c_adc, port p_adc[], adc_pot_state_t &adc_pot_state){
 
     // Set init time for charge
     tmr_charge :> pot_timings.time_trigger_charge;
-    pot_timings.time_trigger_charge += pot_timings.max_charge_period_ticks; // start in one conversion period
+    pot_timings.time_trigger_charge += pot_timings.max_charge_period_ticks; // start in one charge period
     
     while(1) unsafe{
         select{
@@ -420,7 +418,7 @@ void adc_pot_task(chanend c_adc, port p_adc[], adc_pot_state_t &adc_pot_state){
                     break;
                     case ADC_CMD_POT_START_CONV:
                         tmr_charge :> pot_timings.time_trigger_charge;
-                        pot_timings.time_trigger_charge += pot_timings.max_charge_period_ticks; // start in one conversion period
+                        pot_timings.time_trigger_charge += pot_timings.max_charge_period_ticks; // start in one charge period
                         // Clear all history apart from scaling
                         memset(adc_pot_state.results, 0, adc_pot_state.max_seen_ticks_up - adc_pot_state.results);
                         adc_state = ADC_IDLE;
@@ -434,5 +432,39 @@ void adc_pot_task(chanend c_adc, port p_adc[], adc_pot_state_t &adc_pot_state){
                 }
             break;
         }
+
+        // Cycle through the ADC channels
+        if(adc_state == ADC_IDLE){
+            if(++adc_idx == adc_pot_state.num_adc){
+                adc_idx = 0;
+            }
+        }
     } // while 1
+}
+
+
+uint16_t adc_pot_single(port p_adc[], unsigned adc_idx, adc_pot_state_t &adc_pot_state){
+    int16_t result = 0;
+
+    pot_timings_t pot_timings = {0};
+    adc_pot_startup(p_adc, adc_pot_state, pot_timings);
+    do_adc_charge(p_adc, adc_idx, adc_pot_state, pot_timings);
+    delay_ticks(pot_timings.max_charge_period_ticks);
+    do_adc_start_convert(p_adc, adc_idx, adc_pot_state, pot_timings);
+
+    timer tmr_overshoot;
+
+    unsafe{
+        select{
+            case p_adc[adc_idx] when pinseq(adc_pot_state.init_port_val[adc_idx]) :> int _ @ pot_timings.end_time:
+                do_adc_convert(p_adc, adc_idx, adc_pot_state, pot_timings);
+            break;
+            case tmr_overshoot when timerafter(pot_timings.time_trigger_overshoot) :> int _:
+                do_adc_handle_overshoot(p_adc, adc_idx, adc_pot_state, pot_timings);
+            break;
+        }
+        result = adc_pot_state.results[adc_idx];
+    }
+    
+    return result;
 }
