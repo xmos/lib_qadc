@@ -70,8 +70,10 @@ void adc_pot_init(  size_t num_adc,
         ptr += lut_size;
         adc_pot_state.cal_down = ptr;
         ptr += lut_size;
+        // adc_pot_state.filter_write_idx = ptr;
+        // ptr += lut_size;
         unsigned limit = (unsigned)state_buffer + sizeof(uint16_t) * ADC_POT_STATE_SIZE(num_adc, lut_size, filter_depth);
-        assert(ptr == limit);
+        assert(ptr == limit); // Check we have matching sizes
 
         // Set scale and clear tide marks
         for(int i = 0; i < num_adc; i++){

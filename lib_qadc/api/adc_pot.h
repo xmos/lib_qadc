@@ -50,21 +50,22 @@ typedef struct adc_pot_state_t{
     uint16_t * unsafe conversion_history;
     uint16_t * unsafe hysteris_tracker;
     uint16_t * unsafe init_port_val;
+//  uint16_t * unsafe filter_write_idx;
 }adc_pot_state_t;
 
 
 
-// results, init_port_val, filter, hysteresis, max_ticks * 2, scale * 2, lut * 2
 #define ADC_POT_STATE_SIZE(num_adc, lut_size, filter_depth)              (( \
-                             (sizeof(uint16_t) * num_adc) +                 \
-                             (sizeof(uint16_t) * num_adc) +                 \
-                             (sizeof(uint16_t) * num_adc * filter_depth) +  \
-                             (sizeof(uint16_t) * num_adc) +                 \
-                             (sizeof(uint16_t) * num_adc * 2) +             \
-                             (sizeof(uint16_t) * num_adc * 2) +             \
-                             (sizeof(uint16_t) * 2 * lut_size) +            \
+    /* results */            (sizeof(uint16_t) * num_adc) +                 \
+    /* init_port_val */      (sizeof(uint16_t) * num_adc) +                 \
+    /* conversion_history */ (sizeof(uint16_t) * num_adc * filter_depth) +  \
+    /* hysteris_tracker */   (sizeof(uint16_t) * num_adc) +                 \
+    /* max_seen_ticks u/d */ (sizeof(uint16_t) * num_adc * 2) +             \
+    /* max_scale u/d */      (sizeof(uint16_t) * num_adc * 2) +             \
+    /* cal up + cal down */  (sizeof(uint16_t) * 2 * lut_size) +            \
                              (sizeof(uint16_t) - 1)) / sizeof(uint16_t))
 
+//  /* filter_write_idx */   (sizeof(uint16_t) * num_adc)
 
 // Communication protocol
 #define ADC_CMD_READ                0x01000000ULL         
