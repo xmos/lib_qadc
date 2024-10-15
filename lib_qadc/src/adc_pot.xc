@@ -38,7 +38,7 @@ void adc_pot_init(  size_t num_adc,
         adc_pot_state.result_hysteresis = result_hysteresis;
         adc_pot_state.port_time_offset = 32; // Tested at 120MHz thread speed
 
-        // Copy config
+        // Copy config to state
         adc_pot_state.adc_config.capacitor_pf = adc_config.capacitor_pf;
         adc_pot_state.adc_config.potentiometer_ohms = adc_config.potentiometer_ohms;
         adc_pot_state.adc_config.resistor_series_ohms = adc_config.resistor_series_ohms;
@@ -152,8 +152,8 @@ static inline uint16_t post_process_result( uint16_t raw_result,
                                             size_t lookup_size,
                                             unsigned result_hysteresis){
     unsafe{
-        static unsigned filter_write_idx[4] = {0};
-
+        // TODO put this into the state
+        static uint16_t filter_write_idx[4] = {0};
 
         // Apply filter. First populate filter history.
         unsigned offset = adc_idx * result_history_depth + filter_write_idx[adc_idx];
@@ -191,7 +191,7 @@ static inline uint16_t post_process_result( uint16_t raw_result,
 
 typedef struct pot_timings_t{
     int32_t time_trigger_charge;
-    int32_t time_trigger_discharge;
+    int32_t time_trigger_start_convert;
     int32_t time_trigger_overshoot;
     int32_t max_ticks_expected;
     uint32_t max_charge_period_ticks;
@@ -205,7 +205,7 @@ void do_adc_charge(port p_adc[], unsigned adc_idx, adc_pot_state_t &adc_pot_stat
         p_adc[adc_idx] :> adc_pot_state.init_port_val[adc_idx];
         unsigned is_up = adc_pot_state.init_port_val[adc_idx];
 
-        pot_timings.time_trigger_discharge = pot_timings.time_trigger_charge + pot_timings.max_charge_period_ticks;
+        pot_timings.time_trigger_start_convert = pot_timings.time_trigger_charge + pot_timings.max_charge_period_ticks;
 
         p_adc[adc_idx] <: is_up ^ 0x1; // Drive opposite to what we read to "charge"
         pot_timings.max_ticks_expected = is_up != 0 ? 
@@ -219,7 +219,7 @@ void do_adc_start_convert(port p_adc[], unsigned adc_idx, adc_pot_state_t &adc_p
     p_adc[adc_idx] :> int _ @ pot_timings.start_time; // Make Hi Z and grab port time
     // Set up an event to handle if port doesn't reach oppositie value. Set at double the max expected time. This is a fairly fatal 
     // event which is caused by severe mismatch of hardware vs init params
-    pot_timings.time_trigger_overshoot = pot_timings.time_trigger_discharge + (pot_timings.max_ticks_expected * 2);
+    pot_timings.time_trigger_overshoot = pot_timings.time_trigger_start_convert + (pot_timings.max_ticks_expected * 2);
 }
 
 void do_adc_convert(port p_adc[], unsigned adc_idx, adc_pot_state_t &adc_pot_state, pot_timings_t &pot_timings){
@@ -291,7 +291,7 @@ void do_adc_convert(port p_adc[], unsigned adc_idx, adc_pot_state_t &adc_pot_sta
         timer tmr;
         tmr :> time_now;
         if(timeafter(time_now, pot_timings.time_trigger_charge)){
-            dprintf("Error - Conversion time to short\n");
+            dprintf("Error - Conversion period exceeded\n");
         }
     }
 }
@@ -307,7 +307,7 @@ void do_adc_handle_overshoot(port p_adc[], unsigned adc_idx, adc_pot_state_t &ad
         uint16_t post_proc_result = post_process_result(result, adc_pot_state.conversion_history, adc_pot_state.hysteris_tracker, adc_idx, adc_pot_state.num_adc, adc_pot_state.filter_depth, adc_pot_state.lut_size, adc_pot_state.result_hysteresis);
         adc_pot_state.results[adc_idx] = post_proc_result;
 
-        printf("result: %u ch: %u overshoot (ticks>%d) val:%u\n", post_proc_result, adc_idx, pot_timings.time_trigger_overshoot-pot_timings.time_trigger_discharge, overshoot_port_val);
+        printf("result: %u ch: %u overshoot (ticks>%d) val:%u\n", post_proc_result, adc_idx, pot_timings.time_trigger_overshoot-pot_timings.time_trigger_start_convert, overshoot_port_val);
     }
 
     pot_timings.time_trigger_charge += adc_pot_state.adc_config.convert_interval_ticks;
@@ -316,7 +316,7 @@ void do_adc_handle_overshoot(port p_adc[], unsigned adc_idx, adc_pot_state_t &ad
     timer tmr;
     tmr :> time_now;
     if(timeafter(time_now, pot_timings.time_trigger_charge)){
-        printstr("Error - ADC Conversion time to short for configuration\n");
+        dprintf("Error - Conversion period exceeded\n");
     }
 }
 
@@ -365,7 +365,6 @@ void adc_pot_task(chanend c_adc, port p_adc[], adc_pot_state_t &adc_pot_state){
 
     adc_pot_startup(p_adc, adc_pot_state, pot_timings);
 
-
     // Setup initial state
     adc_state_t adc_state = ADC_IDLE;
 
@@ -380,7 +379,7 @@ void adc_pot_task(chanend c_adc, port p_adc[], adc_pot_state_t &adc_pot_state){
                 adc_state = ADC_CHARGING;
             break;
 
-            case adc_state == ADC_CHARGING => tmr_discharge when timerafter(pot_timings.time_trigger_discharge) :> int _:
+            case adc_state == ADC_CHARGING => tmr_discharge when timerafter(pot_timings.time_trigger_start_convert) :> int _:
                 do_adc_start_convert(p_adc, adc_idx, adc_pot_state, pot_timings);
                 adc_state = ADC_CONVERTING;
             break;
@@ -406,7 +405,7 @@ void adc_pot_task(chanend c_adc, port p_adc[], adc_pot_state_t &adc_pot_state){
                 adc_state = ADC_IDLE;
             break;
 
-            // Handle comms. Only do in charging phase which is quite a long period and non critical
+            // Handle comms. Only do in charging phase which is quite a long period and non critical if stretched
             case adc_state == ADC_CHARGING  || adc_state == ADC_STOPPED => c_adc :> uint32_t command:
                 switch(command & ADC_CMD_MASK){
                     case ADC_CMD_READ:
@@ -446,22 +445,23 @@ void adc_pot_task(chanend c_adc, port p_adc[], adc_pot_state_t &adc_pot_state){
 uint16_t adc_pot_single(port p_adc[], unsigned adc_idx, adc_pot_state_t &adc_pot_state){
     int16_t result = 0;
 
+    timer tmr_single;
+
     pot_timings_t pot_timings = {0};
     adc_pot_startup(p_adc, adc_pot_state, pot_timings);
-
+    tmr_single :> pot_timings.time_trigger_charge; // Set origin time. This is the datum for the next few events.
     do_adc_charge(p_adc, adc_idx, adc_pot_state, pot_timings);
-    delay_ticks(pot_timings.max_charge_period_ticks);
+    tmr_single when timerafter(pot_timings.time_trigger_start_convert) :> int _;
     do_adc_start_convert(p_adc, adc_idx, adc_pot_state, pot_timings);
 
-    timer tmr_overshoot;
-
+    // Now wait for conversion or overshoot timeout event
     unsafe{
         select{
             case p_adc[adc_idx] when pinseq(adc_pot_state.init_port_val[adc_idx]) :> int _ @ pot_timings.end_time:
                 do_adc_convert(p_adc, adc_idx, adc_pot_state, pot_timings);
                 printstrln("cv");
             break;
-            case tmr_overshoot when timerafter(pot_timings.time_trigger_overshoot) :> int _:
+            case tmr_single when timerafter(pot_timings.time_trigger_overshoot) :> int _:
                 do_adc_handle_overshoot(p_adc, adc_idx, adc_pot_state, pot_timings);
                 printstrln("os");
             break;
