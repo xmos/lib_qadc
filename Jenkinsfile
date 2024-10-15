@@ -56,7 +56,7 @@ pipeline {
             }
           }
         }
-        stage('Static analysis') {
+        stage('Lib and code checks') {
           steps {
             dir("${REPO}") {
               withVenv {
@@ -71,6 +71,13 @@ pipeline {
             }
           }
         }
+        stage('Docs') {
+          steps {
+            dir("${REPO}") {
+              buildDocs("lib_qadc.zip")
+            }
+          }
+        } // stage: Docs
         stage('Build') {
           steps {
             dir("${REPO}/examples") {
@@ -109,26 +116,5 @@ pipeline {
         }
       }
     } // stage: xcore.ai
-    stage('Docs') {
-      agent {
-        label 'documentation'
-      }
-      steps {
-        runningOn(env.NODE_NAME)
-        dir("${REPO}") {
-          checkout scm
-          createVenv("requirements.txt")
-          withTools(params.TOOLS_VERSION) {
-            buildDocs("lib_qadc.zip")
-          }
-        }
-      }
-      post {
-        cleanup {
-          cleanWs()
-        }
-      }
-    } // stage: Docs
-
   } // stages
 } // pipeline

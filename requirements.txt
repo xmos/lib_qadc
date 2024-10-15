@@ -1,10 +1,9 @@
-# python_version 3.10
+# python_version 3.11
 
 # dependencies
-numpy
-matplotlib
-pathlib
+numpy==1.23.1
+matplotlib==3.5.2
+pathlib==1.0.1
 flake8==3.8.3
-pylint==2.5.3
-pytest==6.0.0
+pytest==8.3.3
 pytest-xdist==1.34.0
