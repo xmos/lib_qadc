@@ -259,12 +259,10 @@ void adc_pot_task(chanend c_adc, port p_adc[], adc_pot_state_t &adc_pot_state){
     pot_timings.max_discharge_period_ticks = (adc_pot_state.max_lut_ticks_up > adc_pot_state.max_lut_ticks_down ?
                                                 adc_pot_state.max_lut_ticks_up : adc_pot_state.max_lut_ticks_down);
 
-    const uint32_t convert_interval_ticks = adc_pot_state.adc_config.convert_interval_ticks;
-
-    dprintf("convert_interval_ticks: %d max charge/discharge_period: %lu\n", convert_interval_ticks, max_charge_period_ticks + max_discharge_period_ticks);
+    dprintf("convert_interval_ticks: %d max charge/discharge_period: %lu\n", adc_pot_state.adc_config.convert_interval_ticks, port_timings.max_charge_period_ticks + port_timings.max_discharge_period_ticks);
     dprintf("max_charge_period_ticks: %lu max_dis_period_ticks (up/down): (%lu,%lu), crossover_idx: %u\n",
             max_charge_period_ticks, adc_pot_state.max_lut_ticks_up, adc_pot_state.max_lut_ticks_down, adc_pot_state.crossover_idx);
-    assert(convert_interval_ticks > pot_timings.max_charge_period_ticks + pot_timings.max_discharge_period_ticks * 2); // Ensure conversion rate is low enough. *2 to allow post processing time
+    assert(adc_pot_state.adc_config.convert_interval_ticks > pot_timings.max_charge_period_ticks + pot_timings.max_discharge_period_ticks * 2); // Ensure conversion rate is low enough. *2 to allow post processing time
 
     // Setup initial state
     adc_state_t adc_state = ADC_IDLE;
@@ -358,7 +356,7 @@ void adc_pot_task(chanend c_adc, port p_adc[], adc_pot_state_t &adc_pot_state){
                     if(++adc_idx == adc_pot_state.num_adc){
                         adc_idx = 0;
                     }
-                    pot_timings.time_trigger_charge += convert_interval_ticks;
+                    pot_timings.time_trigger_charge += adc_pot_state.adc_config.convert_interval_ticks;
                     int32_t time_now;
                     tmr_charge :> time_now;
                     if(timeafter(time_now, pot_timings.time_trigger_charge)){
@@ -383,7 +381,7 @@ void adc_pot_task(chanend c_adc, port p_adc[], adc_pot_state_t &adc_pot_state){
                 if(++adc_idx == adc_pot_state.num_adc){
                     adc_idx = 0;
                 }
-                pot_timings.time_trigger_charge += convert_interval_ticks;
+                pot_timings.time_trigger_charge += adc_pot_state.adc_config.convert_interval_ticks;
 
                 int32_t time_now;
                 tmr_charge :> time_now;
