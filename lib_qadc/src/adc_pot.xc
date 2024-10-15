@@ -310,10 +310,6 @@ void do_adc_handle_overshoot(port p_adc[], unsigned adc_idx, adc_pot_state_t &ad
         printf("result: %u ch: %u overshoot (ticks>%d) val:%u\n", post_proc_result, adc_idx, pot_timings.time_trigger_overshoot-pot_timings.time_trigger_discharge, overshoot_port_val);
     }
 
-
-    if(++adc_idx == adc_pot_state.num_adc){
-        adc_idx = 0;
-    }
     pot_timings.time_trigger_charge += adc_pot_state.adc_config.convert_interval_ticks;
 
     int32_t time_now;
@@ -391,12 +387,22 @@ void adc_pot_task(chanend c_adc, port p_adc[], adc_pot_state_t &adc_pot_state){
 
             case adc_state == ADC_CONVERTING => p_adc[adc_idx] when pinseq(adc_pot_state.init_port_val[adc_idx]) :> int _ @ pot_timings.end_time:
                 do_adc_convert(p_adc, adc_idx, adc_pot_state, pot_timings);
+                
+                // Cycle through the ADC channels
+                if(++adc_idx == adc_pot_state.num_adc){
+                    adc_idx = 0;
+                }
                 adc_state = ADC_IDLE;
             break;
 
             // This case happens if the hardware RC constant is much higher than expected
             case adc_state == ADC_CONVERTING => tmr_overshoot when timerafter(pot_timings.time_trigger_overshoot) :> int _:
                 do_adc_handle_overshoot(p_adc, adc_idx, adc_pot_state, pot_timings);
+                
+                // Cycle through the ADC channels
+                if(++adc_idx == adc_pot_state.num_adc){
+                    adc_idx = 0;
+                }
                 adc_state = ADC_IDLE;
             break;
 
@@ -432,13 +438,6 @@ void adc_pot_task(chanend c_adc, port p_adc[], adc_pot_state_t &adc_pot_state){
                     break;
                 }
             break;
-        }
-
-        // Cycle through the ADC channels
-        if(adc_state == ADC_IDLE){
-            if(++adc_idx == adc_pot_state.num_adc){
-                adc_idx = 0;
-            }
         }
     } // while 1
 }
