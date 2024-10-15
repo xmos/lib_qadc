@@ -38,7 +38,7 @@ pipeline {
     buildDiscarder(xmosDiscardBuildSettings(onlyArtifacts=false))
   } // options
   stages {
-    stage("${REPO}") {
+    stage("QADC pipeline") {
       agent {
         abel 'x86_64 && linux'
       }
