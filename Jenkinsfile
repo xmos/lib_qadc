@@ -1,3 +1,5 @@
+// This file relates to internal XMOS infrastructure and should be ignored by external users
+
 @Library('xmos_jenkins_shared_library@v0.34.0')
 
 def runningOn(machine) {
@@ -48,6 +50,7 @@ pipeline {
           steps {
             dir("${REPO}") {
               withTools(params.TOOLS_VERSION) {
+                sh "cmake -G 'Unix Makefiles' -B build"
                 createVenv("requirements.txt")
                 withVenv {
                   sh "pip install -r requirements.txt"
@@ -74,11 +77,13 @@ pipeline {
         stage('Docs') {
           steps {
             dir("${REPO}") {
-              buildDocs("lib_qadc.zip")
+              warnError("Docs") {
+                buildDocs()
+              }
             }
           }
         } // stage: Docs
-        stage('Build') {
+        stage('Build Examples') {
           steps {
             dir("${REPO}/examples") {
               withTools(params.TOOLS_VERSION) {

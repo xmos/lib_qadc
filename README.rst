@@ -1,6 +1,9 @@
-#################
-Quasi ADC Library
-#################
+:orphan:
+
+
+###########################
+lib_qadc: Quasi ADC Library
+###########################
 
 
 :vendor: XMOS
@@ -66,7 +69,7 @@ Required Tools
 Required Libraries (dependencies)
 *********************************
 
-  * lib_xassert (www.github.com/xmos/lib_xassert)
+  * None
 
 *******
 Support
