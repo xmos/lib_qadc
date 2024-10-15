@@ -73,7 +73,7 @@ pipeline {
             dir("${REPO}") {
               withVenv {
                 warnError("Lib checks") {
-                  rrunLibraryChecks("${WORKSPACE}/${REPO}", "${params.INFR_APPS_VERSION}")
+                  runLibraryChecks("${WORKSPACE}/${REPO}", "${params.INFR_APPS_VERSION}")
                 }
               }
             }
