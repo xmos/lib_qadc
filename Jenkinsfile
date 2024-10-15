@@ -38,9 +38,9 @@ pipeline {
     buildDiscarder(xmosDiscardBuildSettings(onlyArtifacts=false))
   } // options
   stages {
-    stage('xcore.ai') {
+    stage("${REPO}") {
       agent {
-        label 'xcore.ai' // xcore.ai nodes have 2 devices atatched, allowing parallel HW test
+        abel 'x86_64 && linux'
       }
 
       stages {
@@ -72,10 +72,6 @@ pipeline {
           steps {
             dir("${REPO}") {
               withVenv {
-                warnError("Flake") {
-                  sh "flake8 --exit-zero --output-file=flake8.xml lib_qadc"
-                  recordIssues enabledForFailure: true, tool: flake8(pattern: 'flake8.xml')
-                }
                 warnError("Lib checks") {
                   rrunLibraryChecks("${WORKSPACE}/${REPO}", "${params.INFR_APPS_VERSION}")
                 }
