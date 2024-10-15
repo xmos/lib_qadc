@@ -12,19 +12,26 @@ getApproval()
 
 pipeline {
   agent none
-  parameters {
-    string(
-      name: 'TOOLS_VERSION',
-      defaultValue: '15.3.0',
-      description: 'The tools version to build with (check /projects/tools/ReleasesTools/)'
-    )
-  } // parameters
   environment {
     REPO = 'lib_qadc'
-    PIP_VERSION = "24.0"
-    PYTHON_VERSION = "3.11"
-    XMOSDOC_VERSION = "v6.1.2"          
   } // env
+  parameters {
+    string(
+    name: 'TOOLS_VERSION',
+    defaultValue: '15.3.0',
+    description: 'The XTC tools version'
+    )
+    string(
+    name: 'XMOSDOC_VERSION',
+    defaultValue: 'v6.1.2',
+    description: 'The xmosdoc version'
+    )
+    string(
+    name: 'INFR_APPS_VERSION',
+    defaultValue: 'v2.0.1',
+    description: 'The infr_apps version'
+    )
+  }
   options {
     skipDefaultCheckout()
     timestamps()
@@ -70,7 +77,7 @@ pipeline {
                   recordIssues enabledForFailure: true, tool: flake8(pattern: 'flake8.xml')
                 }
                 warnError("Lib checks") {
-                  runLibraryChecks("${WORKSPACE}/${REPO}", "v2.0.1")
+                  rrunLibraryChecks("${WORKSPACE}/${REPO}", "${params.INFR_APPS_VERSION}")
                 }
               }
             }
