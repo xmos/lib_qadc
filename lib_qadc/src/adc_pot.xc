@@ -299,6 +299,32 @@ void do_adc_convert(port p_adc[], unsigned adc_idx, adc_pot_state_t &adc_pot_sta
 }
 
 
+void do_adc_handle_overshoot(port p_adc[], unsigned adc_idx, adc_pot_state_t &adc_pot_state, pot_timings_t &pot_timings){
+    unsigned overshoot_port_val = 0;
+    p_adc[adc_idx] :> overshoot_port_val; // For debug. TODO remove
+
+    unsafe{
+        unsigned is_up = adc_pot_state.init_port_val[adc_idx];
+        uint16_t result = adc_pot_state.crossover_idx + (is_up != 0 ? 1 : 0);
+        uint16_t post_proc_result = post_process_result(result, adc_pot_state.conversion_history, adc_pot_state.hysteris_tracker, adc_idx, adc_pot_state.num_adc, adc_pot_state.filter_depth, adc_pot_state.lut_size, adc_pot_state.result_hysteresis);
+        adc_pot_state.results[adc_idx] = post_proc_result;
+    }
+
+    dprintf("result: %u overshoot (ticks>%d) val:%u\n", result, pot_timings.time_trigger_overshoot-pot_timings.time_trigger_discharge, overshoot_port_val);
+
+    if(++adc_idx == adc_pot_state.num_adc){
+        adc_idx = 0;
+    }
+    pot_timings.time_trigger_charge += adc_pot_state.adc_config.convert_interval_ticks;
+
+    int32_t time_now;
+    timer tmr;
+    tmr :> time_now;
+    if(timeafter(time_now, pot_timings.time_trigger_charge)){
+        printstr("Error - ADC Conversion time to short for configuration\n");
+    }
+}
+
 void adc_pot_task(chanend c_adc, port p_adc[], adc_pot_state_t &adc_pot_state){
     dprintf("adc_pot_task\n");
   
@@ -342,8 +368,6 @@ void adc_pot_task(chanend c_adc, port p_adc[], adc_pot_state_t &adc_pot_state){
     tmr_charge :> pot_timings.time_trigger_charge;
     pot_timings.time_trigger_charge += pot_timings.max_charge_period_ticks; // start in one conversion period
     
-    unsigned is_up = 0; // Copy of adc_pot_state.init_port_val[adc_idx] used for readability
-
     while(1) unsafe{
         select{
             case adc_state == ADC_IDLE => tmr_charge when timerafter(pot_timings.time_trigger_charge) :> int _:
@@ -363,26 +387,7 @@ void adc_pot_task(chanend c_adc, port p_adc[], adc_pot_state_t &adc_pot_state){
 
             // This case happens if the hardware RC constant is much higher than expected
             case adc_state == ADC_CONVERTING => tmr_overshoot when timerafter(pot_timings.time_trigger_overshoot) :> int _:
-                unsigned overshoot_port_val = 0;
-                p_adc[adc_idx] :> overshoot_port_val; // For debug. TODO remove
-
-                uint16_t result = adc_pot_state.crossover_idx + (is_up != 0 ? 1 : 0);
-                uint16_t post_proc_result = post_process_result(result, adc_pot_state.conversion_history, adc_pot_state.hysteris_tracker, adc_idx, adc_pot_state.num_adc, adc_pot_state.filter_depth, adc_pot_state.lut_size, adc_pot_state.result_hysteresis);
-                unsafe{adc_pot_state.results[adc_idx] = post_proc_result;}
-
-                dprintf("result: %u overshoot (ticks>%d) val:%u\n", result, pot_timings.time_trigger_overshoot-pot_timings.time_trigger_discharge, overshoot_port_val);
-
-                if(++adc_idx == adc_pot_state.num_adc){
-                    adc_idx = 0;
-                }
-                pot_timings.time_trigger_charge += adc_pot_state.adc_config.convert_interval_ticks;
-
-                int32_t time_now;
-                tmr_charge :> time_now;
-                if(timeafter(time_now, pot_timings.time_trigger_charge)){
-                    printstr("Error - ADC Conversion time to short for configuration\n");
-                }
-
+                do_adc_handle_overshoot(p_adc, adc_idx, adc_pot_state, pot_timings);
                 adc_state = ADC_IDLE;
             break;
 
