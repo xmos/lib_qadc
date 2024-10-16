@@ -49,17 +49,21 @@ void control_task(chanend c_adc){
 void adc_pot_single_example(port p_adc[], adc_pot_state_t &adc_pot_state){
     printf("Hello!\n");
 
+    int t0, t1; // For timing the ADC read
+    timer tmr;
+
     while(1){
         uint32_t adc[NUM_ADC];
-        uint32_t adc_dir[NUM_ADC];
 
         printf("Read ADC ");
         for(unsigned ch = 0; ch < NUM_ADC; ch++){
+            // This blocks until the conversion is complete
+            tmr :> t0;
             adc[ch] = adc_pot_single(p_adc, ch, adc_pot_state);
-            printf("%u: %u (%u), ", ch, adc[ch], adc_dir[ch]);
+            tmr :> t1;
+            printf("%u: %u (milliseconds: %d), ", ch, adc[ch], (t1 - t0) / XS1_TIMER_KHZ);
         }
         putchar('\n');
-        delay_milliseconds(100);
     }
 
 }
@@ -91,7 +95,8 @@ int main() {
             adc_pot_state_t adc_pot_state;
 
             uint16_t state_buffer[ADC_POT_STATE_SIZE(NUM_ADC, LUT_SIZE, FILTER_DEPTH)];
-            adc_pot_init(NUM_ADC, LUT_SIZE, FILTER_DEPTH, HYSTERESIS, state_buffer, adc_config, adc_pot_state);
+            unsigned used_filter_depth = CONTINUOUS == 1 ? FILTER_DEPTH : 1;
+            adc_pot_init(NUM_ADC, LUT_SIZE, used_filter_depth, HYSTERESIS, state_buffer, adc_config, adc_pot_state);
 
 #if (CONTINUOUS == 1)
             chan c_adc;

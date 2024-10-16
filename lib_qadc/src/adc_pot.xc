@@ -21,7 +21,7 @@ typedef enum adc_state_t{
         ADC_CONVERTING = 0 // Optimisation as ISA can do != 0 on select guard
 }adc_state_t;
 
-
+// maybe return a ptr to results??
 void adc_pot_init(  size_t num_adc,
                     size_t lut_size,
                     size_t filter_depth,
@@ -309,7 +309,7 @@ void do_adc_handle_overshoot(port p_adc[], unsigned adc_idx, adc_pot_state_t &ad
         uint16_t post_proc_result = post_process_result(result, adc_pot_state.conversion_history, adc_pot_state.hysteris_tracker, adc_idx, adc_pot_state.num_adc, adc_pot_state.filter_depth, adc_pot_state.lut_size, adc_pot_state.result_hysteresis);
         adc_pot_state.results[adc_idx] = post_proc_result;
 
-        printf("result: %u ch: %u overshoot (ticks>%d) val:%u\n", post_proc_result, adc_idx, pot_timings.time_trigger_overshoot-pot_timings.time_trigger_start_convert, overshoot_port_val);
+        dprintf("result: %u ch: %u overshoot (ticks>%d) val:%u\n", post_proc_result, adc_idx, pot_timings.time_trigger_overshoot-pot_timings.time_trigger_start_convert, overshoot_port_val);
     }
 
     pot_timings.time_trigger_charge += adc_pot_state.adc_config.convert_interval_ticks;
@@ -461,11 +461,9 @@ uint16_t adc_pot_single(port p_adc[], unsigned adc_idx, adc_pot_state_t &adc_pot
         select{
             case p_adc[adc_idx] when pinseq(adc_pot_state.init_port_val[adc_idx]) :> int _ @ pot_timings.end_time:
                 do_adc_convert(p_adc, adc_idx, adc_pot_state, pot_timings);
-                printstrln("cv");
             break;
             case tmr_single when timerafter(pot_timings.time_trigger_overshoot) :> int _:
                 do_adc_handle_overshoot(p_adc, adc_idx, adc_pot_state, pot_timings);
-                printstrln("os");
             break;
         }
         result = adc_pot_state.results[adc_idx];

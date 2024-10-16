@@ -23,6 +23,7 @@ typedef struct adc_pot_config_t{
 }adc_pot_config_t;
 
 typedef uint16_t         q3_13_fixed_t;
+
 #define Q_3_13_SHIFT    13
 
 
