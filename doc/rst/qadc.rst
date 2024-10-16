@@ -233,6 +233,6 @@ The series resistor value is a compromise. Ideally it would set to a low value t
 QADC Potentiometer API
 ----------------------
 
-.. doxygengroup:: qadc_pot
+.. doxygengroup:: lib_qadc_pot_reader
    :content-only:
 
