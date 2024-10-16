@@ -12,9 +12,6 @@
 #define FILTER_DEPTH        16
 #define HYSTERESIS          1
 
-// The continuous mode allows for a shared memory interface if the QADC is on the same tile.
-#define USE_SHARED_MEMORY   0
-
 on tile[1]: port p_adc[] = {XS1_PORT_1M, XS1_PORT_1O}; // Sets which pins are to be used (channels 0..n) X1D36/38
 
 
@@ -113,8 +110,10 @@ int main() {
             // Only use moving average filter if in continuous mode
             unsigned used_filter_depth = (CONTINUOUS == 1) ? FILTER_DEPTH : 1;
             adc_pot_init(p_adc, NUM_ADC, LUT_SIZE, used_filter_depth, HYSTERESIS, state_buffer, adc_config, adc_pot_state);
+            
 
 #if (CONTINUOUS == 1)
+// The continuous mode allows for a shared memory interface if the QADC is on the same tile.
 #if USE_SHARED_MEMORY
             unsafe {
                 uint16_t * unsafe result_ptr = adc_pot_state.results;
@@ -134,6 +133,7 @@ int main() {
                 control_task(c_adc, NULL);
             }
 #endif // USE_SHARED_MEMORY
+#else
             adc_pot_single_example(p_adc, adc_pot_state);
 #endif // (CONTINUOUS == 1)
         }
