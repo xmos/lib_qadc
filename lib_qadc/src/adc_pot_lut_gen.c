@@ -65,7 +65,7 @@ void gen_lookup_pot(uint16_t * up, uint16_t * down, unsigned num_points,
 
     }
 
-    printf("max_lut_ticks_up: %lu max_lut_ticks_down: %lu\n", *max_lut_ticks_up, *max_lut_ticks_down);
+    dprintf("max_lut_ticks_up: %lu max_lut_ticks_down: %lu\n", *max_lut_ticks_up, *max_lut_ticks_down);
 
     assert(*max_lut_ticks_up < 65536); // We have a 16b port timer, so if max is more than this, then we need to slow clock or lower RC
     assert(*max_lut_ticks_down < 65536); // We have a 16b port timer, so if max is more than this, then we need to slow clock or lower RC

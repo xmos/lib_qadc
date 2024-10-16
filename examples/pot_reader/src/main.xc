@@ -9,13 +9,15 @@
 
 #define NUM_ADC         2
 #define LUT_SIZE        1024
-#define FILTER_DEPTH    8
+#define FILTER_DEPTH    16
 #define HYSTERESIS      1
 
 on tile[1]: port p_adc[] = {XS1_PORT_1M, XS1_PORT_1O}; // Sets which pins are to be used (channels 0..n) X1D36/38
 
 
 void control_task(chanend c_adc){
+    printf("Running QADC in continuous mode using dedicated task!\n");
+
     unsigned counter = 0;
 
     while(1){
@@ -35,7 +37,7 @@ void control_task(chanend c_adc){
         delay_milliseconds(100);
 
         // Optionally pause so we can read pot voltage for testing
-        if(counter == 10){
+        if(++counter == 10){
             printf("Restarting ADC...\n");
             c_adc <: (uint32_t)ADC_CMD_POT_STOP_CONV;
             delay_milliseconds(1000); // Time to read the actual pot voltage
@@ -47,7 +49,7 @@ void control_task(chanend c_adc){
 }
 
 void adc_pot_single_example(port p_adc[], adc_pot_state_t &adc_pot_state){
-    printf("Hello!\n");
+    printf("Running QADC in single shot mode using function call!\n");
 
     int t0, t1; // For timing the ADC read
     timer tmr;
@@ -73,12 +75,9 @@ void adc_pot_single_example(port p_adc[], adc_pot_state_t &adc_pot_state){
 int main() {
     par{
         on tile[1]:{
-            printf("Running QADC Pot reader. API = %s\n", CONTINUOUS == 1 ? "CONTINUOUS" : "SINGLE");
-
-
-            const unsigned capacitor_pf = 8800;
-            const unsigned potentiometer_ohms = 10000; // nominal maximum value ned to end
-            const unsigned resistor_series_ohms = 220;
+            const unsigned capacitor_pf = 8800;        // Set the capacitor value here
+            const unsigned potentiometer_ohms = 10000; // Set the potenitiometer nominal maximum value (end to end)
+            const unsigned resistor_series_ohms = 220; // Set the series resistor value here
 
             const float v_rail = 3.3;
             const float v_thresh = 1.15;
@@ -98,7 +97,7 @@ int main() {
             uint16_t state_buffer[ADC_POT_STATE_SIZE(NUM_ADC, LUT_SIZE, FILTER_DEPTH)];
 
             // Only use moving average filter if in continuous mode
-            unsigned used_filter_depth = CONTINUOUS == 1 ? FILTER_DEPTH : 1;
+            unsigned used_filter_depth = (CONTINUOUS == 1) ? FILTER_DEPTH : 1;
             adc_pot_init(p_adc, NUM_ADC, LUT_SIZE, used_filter_depth, HYSTERESIS, state_buffer, adc_config, adc_pot_state);
 
 #if (CONTINUOUS == 1)

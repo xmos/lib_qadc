@@ -102,68 +102,74 @@ void adc_pot_init(  port p_adc[],
 }
 
 
-static inline unsigned ticks_to_position(int is_up,
-                                        uint16_t ticks,
-                                        uint16_t * unsafe up,
-                                        uint16_t * unsafe down,
-                                        unsigned num_points,
-                                        unsigned port_time_offset,
-                                        q3_13_fixed_t max_scale_up,
-                                        q3_13_fixed_t max_scale_down){
-    unsigned max_arg = 0;
+static inline unsigned ticks_to_position(int is_up, uint16_t ticks, unsigned adc_idx, adc_pot_state_t &adc_pot_state){
+    unsafe{
 
-    // Remove fixed proc time overhead (nulls end positions)
-    if(ticks > port_time_offset){
-        ticks -= port_time_offset;
-    } else{
-        ticks = 0;
-    }
+        // Extract vars for readibility
+        uint16_t * unsafe up = adc_pot_state.cal_up;
+        uint16_t * unsafe down = adc_pot_state.cal_down;
+        unsigned num_points = adc_pot_state.lut_size;
+        unsigned port_time_offset = adc_pot_state.port_time_offset;
+        q3_13_fixed_t max_scale_up = adc_pot_state.max_scale_up[adc_idx];
+        q3_13_fixed_t max_scale_down = adc_pot_state.max_scale_down[adc_idx];
 
-    if(is_up) unsafe{
-        //Apply scaling (for best adjusting crossover smoothness)
-        ticks = (uint32_t)ticks << Q_3_13_SHIFT / max_scale_up;
-        // ticks = ((int64_t)max_scale_up * (int64_t)ticks) >> Q_3_13_SHIFT;
-        
-        uint16_t max = 0;
-        max_arg = num_points - 1;
-        for(int i = num_points - 1; i >= 0; i--){
-            if(ticks > up[i]){
-                if(up[i] > max){
-                    max_arg = i - 1;
-                    max = up[i];
-                } 
-            }
+        unsigned max_arg = 0;
+
+        // Remove fixed proc time overhead (nulls end positions)
+        if(ticks > port_time_offset){
+            ticks -= port_time_offset;
+        } else{
+            ticks = 0;
         }
-    } else unsafe{
-        //Apply scaling (for best adjusting crossover smoothness)
-        ticks = (uint32_t)ticks << Q_3_13_SHIFT / max_scale_down;
-        // ticks = ((int64_t)max_scale_down * (int64_t)ticks) >> Q_3_13_SHIFT;
 
-        int16_t max = 0;
-        for(int i = 0; i < num_points; i++){
-            if(ticks > down[i]){
-                if(down[i] > max){
-                    max_arg = i;
-                    max = up[i];
+        if(is_up){
+            //Apply scaling (for best adjusting crossover smoothness)
+            ticks = (uint32_t)ticks << Q_3_13_SHIFT / max_scale_up;
+            // ticks = ((int64_t)max_scale_up * (int64_t)ticks) >> Q_3_13_SHIFT;
+            
+            uint16_t max = 0;
+            max_arg = num_points - 1;
+            for(int i = num_points - 1; i >= 0; i--){
+                if(ticks > up[i]){
+                    if(up[i] > max){
+                        max_arg = i - 1;
+                        max = up[i];
+                    } 
+                }
+            }
+        } else {
+            //Apply scaling (for best adjusting crossover smoothness)
+            ticks = (uint32_t)ticks << Q_3_13_SHIFT / max_scale_down;
+            // ticks = ((int64_t)max_scale_down * (int64_t)ticks) >> Q_3_13_SHIFT;
+
+            int16_t max = 0;
+            for(int i = 0; i < num_points; i++){
+                if(ticks > down[i]){
+                    if(down[i] > max){
+                        max_arg = i;
+                        max = up[i];
+                    }
                 }
             }
         }
-    }
 
-    return max_arg;
+        return max_arg;
+    }
 }
 
 
-static inline uint16_t post_process_result( uint16_t raw_result,
-                                            uint16_t *unsafe conversion_history,
-                                            uint16_t *unsafe hysteris_tracker,
-                                            unsigned adc_idx,
-                                            size_t num_adc,
-                                            size_t result_history_depth,
-                                            size_t lookup_size,
-                                            unsigned result_hysteresis,
-                                            uint16_t *unsafe filter_write_idx){
+static inline uint16_t post_process_result( uint16_t raw_result, unsigned adc_idx, adc_pot_state_t &adc_pot_state){
     unsafe{
+        // Extract vars for readibility
+        uint16_t *unsafe conversion_history = adc_pot_state.conversion_history;
+        uint16_t *unsafe hysteris_tracker = adc_pot_state.hysteris_tracker;
+        size_t num_adc = adc_pot_state.num_adc;
+        size_t result_history_depth = adc_pot_state.filter_depth;
+        size_t lookup_size = adc_pot_state.lut_size;
+        unsigned result_hysteresis = adc_pot_state.result_hysteresis;
+        uint16_t *unsafe filter_write_idx = adc_pot_state.filter_write_idx;
+
+
         // Apply filter. First populate filter history.
         unsigned offset = adc_idx * result_history_depth + filter_write_idx[adc_idx];
         *(conversion_history + offset) = raw_result;
@@ -172,7 +178,7 @@ static inline uint16_t post_process_result( uint16_t raw_result,
             filter_write_idx[adc_idx] = 0;
         }
 
-        // Apply moving average filter
+        // Calculate moving average filter
         uint32_t accum = 0;
         uint16_t *unsafe hist_ptr = conversion_history + adc_idx * result_history_depth;
         for(int i = 0; i < result_history_depth; i++){
@@ -197,7 +203,7 @@ static inline uint16_t post_process_result( uint16_t raw_result,
     }
 }
 
-
+// Struct which contains the various timings and event triggers for the conversion
 typedef struct pot_timings_t{
     int32_t time_trigger_charge;
     int32_t time_trigger_start_convert;
@@ -208,6 +214,7 @@ typedef struct pot_timings_t{
     int16_t start_time;
     int16_t end_time;
 }pot_timings_t;
+
 
 void do_adc_charge(port p_adc[], unsigned adc_idx, adc_pot_state_t &adc_pot_state, pot_timings_t &pot_timings){
     unsafe{
@@ -275,22 +282,8 @@ void do_adc_convert(port p_adc[], unsigned adc_idx, adc_pot_state_t &adc_pot_sta
         }
 
         // Turn time and direction into ADC reading
-        uint16_t result = ticks_to_position(is_up,
-                                            conversion_time,
-                                            adc_pot_state.cal_up,
-                                            adc_pot_state.cal_down,
-                                            adc_pot_state.lut_size,
-                                            adc_pot_state.port_time_offset,
-                                            adc_pot_state.max_scale_up[adc_idx],
-                                            adc_pot_state.max_scale_down[adc_idx]);
-        uint16_t post_proc_result = post_process_result(result,
-                                                        adc_pot_state.conversion_history,
-                                                        adc_pot_state.hysteris_tracker,
-                                                        adc_idx, adc_pot_state.num_adc,
-                                                        adc_pot_state.filter_depth,
-                                                        adc_pot_state.lut_size,
-                                                        adc_pot_state.result_hysteresis,
-                                                        adc_pot_state.filter_write_idx);
+        uint16_t result = ticks_to_position(is_up, conversion_time, adc_idx, adc_pot_state);
+        uint16_t post_proc_result = post_process_result(result, adc_idx, adc_pot_state);
         adc_pot_state.results[adc_idx] = post_proc_result;
         dprintf("result: %u post_proc: %u ticks: %u is_up: %d mu: %lu md: %lu\n",
             result, post_proc_result, conversion_time, is_up, adc_pot_state.max_seen_ticks_up[adc_idx], adc_pot_state.max_seen_ticks_down[adc_idx]);
@@ -309,12 +302,12 @@ void do_adc_convert(port p_adc[], unsigned adc_idx, adc_pot_state_t &adc_pot_sta
 
 void do_adc_handle_overshoot(port p_adc[], unsigned adc_idx, adc_pot_state_t &adc_pot_state, pot_timings_t &pot_timings){
     unsigned overshoot_port_val = 0;
-    p_adc[adc_idx] :> overshoot_port_val; // For debug. TODO remove
+    p_adc[adc_idx] :> overshoot_port_val; // For debug only.
 
     unsafe{
         unsigned is_up = adc_pot_state.init_port_val[adc_idx];
         uint16_t result = adc_pot_state.crossover_idx + (is_up != 0 ? 1 : 0);
-        uint16_t post_proc_result = post_process_result(result, adc_pot_state.conversion_history, adc_pot_state.hysteris_tracker, adc_idx, adc_pot_state.num_adc, adc_pot_state.filter_depth, adc_pot_state.lut_size, adc_pot_state.result_hysteresis, adc_pot_state.filter_write_idx);
+        uint16_t post_proc_result = post_process_result(result, adc_idx, adc_pot_state);
         adc_pot_state.results[adc_idx] = post_proc_result;
 
         dprintf("result: %u ch: %u overshoot (ticks>%d) val:%u\n", post_proc_result, adc_idx, pot_timings.time_trigger_overshoot-pot_timings.time_trigger_start_convert, overshoot_port_val);
@@ -331,7 +324,7 @@ void do_adc_handle_overshoot(port p_adc[], unsigned adc_idx, adc_pot_state_t &ad
 }
 
 
-void adc_pot_init_timings(port p_adc[], adc_pot_state_t &adc_pot_state, pot_timings_t &pot_timings){
+void do_adc_timing_init(port p_adc[], adc_pot_state_t &adc_pot_state, pot_timings_t &pot_timings){
     // Work out timing limits
     const unsigned capacitor_pf = adc_pot_state.adc_config.capacitor_pf;
     const unsigned potentiometer_ohms = adc_pot_state.adc_config.potentiometer_ohms;
@@ -362,7 +355,7 @@ void adc_pot_task(chanend c_adc, port p_adc[], adc_pot_state_t &adc_pot_state){
     // Timing struct
     pot_timings_t pot_timings = {0};
 
-    adc_pot_init_timings(p_adc, adc_pot_state, pot_timings);
+    do_adc_timing_init(p_adc, adc_pot_state, pot_timings);
 
     // Setup initial state
     adc_state_t adc_state = ADC_IDLE;
@@ -447,10 +440,10 @@ uint16_t adc_pot_single(port p_adc[], unsigned adc_idx, adc_pot_state_t &adc_pot
     timer tmr_single;
 
     pot_timings_t pot_timings = {0};
-    adc_pot_init_timings(p_adc, adc_pot_state, pot_timings);
+    do_adc_timing_init(p_adc, adc_pot_state, pot_timings);
     tmr_single :> pot_timings.time_trigger_charge; // Set origin time. This is the datum for the following events.
-    do_adc_charge(p_adc, adc_idx, adc_pot_state, pot_timings);
-    tmr_single when timerafter(pot_timings.time_trigger_start_convert) :> int _;
+    do_adc_charge(p_adc, adc_idx, adc_pot_state, pot_timings); // Start charging
+    tmr_single when timerafter(pot_timings.time_trigger_start_convert) :> int _; // Wait until fully charged
     do_adc_start_convert(p_adc, adc_idx, adc_pot_state, pot_timings);
 
     // Now wait for conversion or overshoot timeout event
