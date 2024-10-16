@@ -51,7 +51,7 @@ typedef struct adc_pot_state_t{
     uint16_t * unsafe conversion_history;
     uint16_t * unsafe hysteris_tracker;
     uint16_t * unsafe init_port_val;
-//  uint16_t * unsafe filter_write_idx;
+    uint16_t * unsafe filter_write_idx;
 }adc_pot_state_t;
 
 
@@ -64,9 +64,9 @@ typedef struct adc_pot_state_t{
     /* max_seen_ticks u/d */ (sizeof(uint16_t) * num_adc * 2) +             \
     /* max_scale u/d */      (sizeof(uint16_t) * num_adc * 2) +             \
     /* cal up + cal down */  (sizeof(uint16_t) * 2 * lut_size) +            \
+    /* filter_write_idx */   (sizeof(uint16_t) * num_adc) +                 \
                              (sizeof(uint16_t) - 1)) / sizeof(uint16_t))
 
-//  /* filter_write_idx */   (sizeof(uint16_t) * num_adc)
 
 // Communication protocol
 #define ADC_CMD_READ                0x01000000ULL         

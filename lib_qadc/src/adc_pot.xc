@@ -70,8 +70,8 @@ void adc_pot_init(  port p_adc[],
         ptr += lut_size;
         adc_pot_state.cal_down = ptr;
         ptr += lut_size;
-        // adc_pot_state.filter_write_idx = ptr;
-        // ptr += lut_size;
+        adc_pot_state.filter_write_idx = ptr;
+        ptr += num_adc;
         unsigned limit = (unsigned)state_buffer + sizeof(uint16_t) * ADC_POT_STATE_SIZE(num_adc, lut_size, filter_depth);
         assert(ptr == limit); // Check we have matching sizes
 
@@ -95,7 +95,7 @@ void adc_pot_init(  port p_adc[],
         for(int i = 0; i < adc_pot_state.num_adc; i++){
             unsigned dummy;
             p_adc[i] :> dummy;
-            // Simulator doesn't like setc so only do for hardware
+            // Simulator doesn't like setc so only do for hardware. isSimulation() takes 100ms or so per port so do here.
             if(!isSimulation()) set_pad_properties(p_adc[i], port_drive, PULL_NONE, 1, 0);
         }
     }
@@ -161,11 +161,9 @@ static inline uint16_t post_process_result( uint16_t raw_result,
                                             size_t num_adc,
                                             size_t result_history_depth,
                                             size_t lookup_size,
-                                            unsigned result_hysteresis){
+                                            unsigned result_hysteresis,
+                                            uint16_t *unsafe filter_write_idx){
     unsafe{
-        // TODO put this into the state
-        static uint16_t filter_write_idx[4] = {0};
-
         // Apply filter. First populate filter history.
         unsigned offset = adc_idx * result_history_depth + filter_write_idx[adc_idx];
         *(conversion_history + offset) = raw_result;
@@ -291,7 +289,8 @@ void do_adc_convert(port p_adc[], unsigned adc_idx, adc_pot_state_t &adc_pot_sta
                                                         adc_idx, adc_pot_state.num_adc,
                                                         adc_pot_state.filter_depth,
                                                         adc_pot_state.lut_size,
-                                                        adc_pot_state.result_hysteresis);
+                                                        adc_pot_state.result_hysteresis,
+                                                        adc_pot_state.filter_write_idx);
         adc_pot_state.results[adc_idx] = post_proc_result;
         dprintf("result: %u post_proc: %u ticks: %u is_up: %d mu: %lu md: %lu\n",
             result, post_proc_result, conversion_time, is_up, adc_pot_state.max_seen_ticks_up[adc_idx], adc_pot_state.max_seen_ticks_down[adc_idx]);
@@ -315,7 +314,7 @@ void do_adc_handle_overshoot(port p_adc[], unsigned adc_idx, adc_pot_state_t &ad
     unsafe{
         unsigned is_up = adc_pot_state.init_port_val[adc_idx];
         uint16_t result = adc_pot_state.crossover_idx + (is_up != 0 ? 1 : 0);
-        uint16_t post_proc_result = post_process_result(result, adc_pot_state.conversion_history, adc_pot_state.hysteris_tracker, adc_idx, adc_pot_state.num_adc, adc_pot_state.filter_depth, adc_pot_state.lut_size, adc_pot_state.result_hysteresis);
+        uint16_t post_proc_result = post_process_result(result, adc_pot_state.conversion_history, adc_pot_state.hysteris_tracker, adc_idx, adc_pot_state.num_adc, adc_pot_state.filter_depth, adc_pot_state.lut_size, adc_pot_state.result_hysteresis, adc_pot_state.filter_write_idx);
         adc_pot_state.results[adc_idx] = post_proc_result;
 
         dprintf("result: %u ch: %u overshoot (ticks>%d) val:%u\n", post_proc_result, adc_idx, pot_timings.time_trigger_overshoot-pot_timings.time_trigger_start_convert, overshoot_port_val);
