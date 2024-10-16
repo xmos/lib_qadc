@@ -83,7 +83,7 @@ void adc_pot_init(port p_adc[], size_t num_adc, size_t lut_size, size_t filter_d
 uint16_t adc_pot_single(port p_adc[], unsigned ad_idx, adc_pot_state_t &adc_pot_state);
 
 #ifdef __XC__
-void adc_pot_task(chanend c_adc, port p_adc[], adc_pot_state_t &adc_pot_state);
+void adc_pot_task(chanend ?c_adc, port p_adc[], adc_pot_state_t &adc_pot_state);
 #else
 DECLARE_JOB(adc_task, (chanend_t, port_t[], size_t));
 void adc_pot_task(chanend_t c_adc, port_t p_adc[], size_t num_adc, adc_pot_config_t adc_config);

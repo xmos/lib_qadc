@@ -7,15 +7,18 @@
 
 #include "adc_pot.h"
 
-#define NUM_ADC         2
-#define LUT_SIZE        1024
-#define FILTER_DEPTH    16
-#define HYSTERESIS      1
+#define NUM_ADC             2
+#define LUT_SIZE            1024
+#define FILTER_DEPTH        16
+#define HYSTERESIS          1
+
+// The continuous mode allows for a shared memory interface if the QADC is on the same tile.
+#define USE_SHARED_MEMORY   0
 
 on tile[1]: port p_adc[] = {XS1_PORT_1M, XS1_PORT_1O}; // Sets which pins are to be used (channels 0..n) X1D36/38
 
 
-void control_task(chanend c_adc){
+void control_task(chanend ?c_adc, uint16_t * unsafe result_ptr){
     printf("Running QADC in continuous mode using dedicated task!\n");
 
     unsigned counter = 0;
@@ -26,24 +29,35 @@ void control_task(chanend c_adc){
 
         printf("Read channel ");
         for(unsigned ch = 0; ch < NUM_ADC; ch++){
-            c_adc <: (uint32_t)ADC_CMD_READ | ch;
-            c_adc :> adc[ch];
-            c_adc <: (uint32_t)ADC_CMD_POT_GET_DIR | ch;
-            c_adc :> adc_dir[ch];
+            if(isnull(c_adc)) unsafe{
+                adc[ch] = result_ptr[ch];
+                adc_dir[ch] = 0;
 
-            printf("ch %u: %u (%u), ", ch, adc[ch], adc_dir[ch]);
+                printf("ch %u: %u, ", ch, adc[ch]);
+
+            } else {
+                c_adc <: (uint32_t)ADC_CMD_READ | ch;
+                c_adc :> adc[ch];
+                c_adc <: (uint32_t)ADC_CMD_POT_GET_DIR | ch; // Get the direction of conversion (from which rail it started)
+                c_adc :> adc_dir[ch];
+
+                printf("ch %u: %u (%u), ", ch, adc[ch], adc_dir[ch]);
+            }
+
         }
         putchar('\n');
         delay_milliseconds(100);
 
-        // Optionally pause so we can read pot voltage for testing
-        if(++counter == 10){
-            printf("Restarting ADC...\n");
-            c_adc <: (uint32_t)ADC_CMD_POT_STOP_CONV;
-            delay_milliseconds(1000); // Time to read the actual pot voltage
-            c_adc <: (uint32_t)ADC_CMD_POT_START_CONV;
-            counter = 0;
-            delay_milliseconds(100);
+        // If using channel comms pause so we can read pot voltage for testing
+        if(!isnull(c_adc)){
+            if(++counter == 10){
+                printf("Restarting ADC...\n");
+                c_adc <: (uint32_t)ADC_CMD_POT_STOP_CONV;
+                delay_milliseconds(1000); // Time to read the actual pot voltage
+                c_adc <: (uint32_t)ADC_CMD_POT_START_CONV;
+                counter = 0;
+                delay_milliseconds(100);
+            }
         }
     }
 }
@@ -101,16 +115,27 @@ int main() {
             adc_pot_init(p_adc, NUM_ADC, LUT_SIZE, used_filter_depth, HYSTERESIS, state_buffer, adc_config, adc_pot_state);
 
 #if (CONTINUOUS == 1)
+#if USE_SHARED_MEMORY
+            unsafe {
+                uint16_t * unsafe result_ptr = adc_pot_state.results;
+
+                par
+                {
+                    adc_pot_task(NULL, p_adc, adc_pot_state);
+                    control_task(NULL, result_ptr);
+                }
+            }
+#else
             chan c_adc;
 
             par
             {
                 adc_pot_task(c_adc, p_adc, adc_pot_state);
-                control_task(c_adc);
+                control_task(c_adc, NULL);
             }
-#else
+#endif // USE_SHARED_MEMORY
             adc_pot_single_example(p_adc, adc_pot_state);
-#endif
+#endif // (CONTINUOUS == 1)
         }
     }
 

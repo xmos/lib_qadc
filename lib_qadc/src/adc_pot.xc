@@ -341,7 +341,7 @@ void do_adc_timing_init(port p_adc[], adc_pot_state_t &adc_pot_state, pot_timing
 
 }
 
-void adc_pot_task(chanend c_adc, port p_adc[], adc_pot_state_t &adc_pot_state){
+void adc_pot_task(chanend ?c_adc, port p_adc[], adc_pot_state_t &adc_pot_state){
     dprintf("adc_pot_task\n");
   
     // Current conversion index
@@ -398,7 +398,7 @@ void adc_pot_task(chanend c_adc, port p_adc[], adc_pot_state_t &adc_pot_state){
             break;
 
             // Handle comms. Only do in charging phase which is quite a long period and non critical if stretched
-            case adc_state == ADC_CHARGING  || adc_state == ADC_STOPPED => c_adc :> uint32_t command:
+            case (adc_state == ADC_CHARGING || adc_state == ADC_STOPPED) && !isnull(c_adc) => c_adc :> uint32_t command:
                 switch(command & ADC_CMD_MASK){
                     case ADC_CMD_READ:
                         uint32_t ch = command & (~ADC_CMD_MASK);
