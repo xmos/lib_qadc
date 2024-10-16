@@ -21,8 +21,8 @@ typedef enum adc_state_t{
         ADC_CONVERTING = 0 // Optimisation as ISA can do != 0 on select guard
 }adc_state_t;
 
-// maybe return a ptr to results??
-void adc_pot_init(  size_t num_adc,
+void adc_pot_init(  port p_adc[], 
+                    size_t num_adc,
                     size_t lut_size,
                     size_t filter_depth,
                     unsigned result_hysteresis,
@@ -89,6 +89,15 @@ void adc_pot_init(  size_t num_adc,
                         adc_config.v_rail, adc_config.v_thresh,
                         &adc_pot_state.max_lut_ticks_up, &adc_pot_state.max_lut_ticks_down);
         adc_pot_state.crossover_idx = (unsigned)(adc_config.v_thresh / adc_config.v_rail * adc_pot_state.lut_size);
+
+        // Set all ports to input and set drive strength to low to reduce switching noise
+        const int port_drive = DRIVE_2MA;
+        for(int i = 0; i < adc_pot_state.num_adc; i++){
+            unsigned dummy;
+            p_adc[i] :> dummy;
+            // Simulator doesn't like setc so only do for hardware
+            if(!isSimulation()) set_pad_properties(p_adc[i], port_drive, PULL_NONE, 1, 0);
+        }
     }
 }
 
@@ -323,18 +332,7 @@ void do_adc_handle_overshoot(port p_adc[], unsigned adc_idx, adc_pot_state_t &ad
 }
 
 
-void adc_pot_startup(port p_adc[], adc_pot_state_t &adc_pot_state, pot_timings_t &pot_timings){
-    // Set all ports to input and set drive strength
-    const int port_drive = DRIVE_2MA;
-    for(int i = 0; i < adc_pot_state.num_adc; i++){
-        unsigned dummy;
-        p_adc[i] :> dummy;
-        // Simulator doesn't like setc
-        if(!isSimulation()) set_pad_properties(p_adc[i], port_drive, PULL_NONE, 1, 0);
-
-    }
-
-
+void adc_pot_init_timings(port p_adc[], adc_pot_state_t &adc_pot_state, pot_timings_t &pot_timings){
     // Work out timing limits
     const unsigned capacitor_pf = adc_pot_state.adc_config.capacitor_pf;
     const unsigned potentiometer_ohms = adc_pot_state.adc_config.potentiometer_ohms;
@@ -365,7 +363,7 @@ void adc_pot_task(chanend c_adc, port p_adc[], adc_pot_state_t &adc_pot_state){
     // Timing struct
     pot_timings_t pot_timings = {0};
 
-    adc_pot_startup(p_adc, adc_pot_state, pot_timings);
+    adc_pot_init_timings(p_adc, adc_pot_state, pot_timings);
 
     // Setup initial state
     adc_state_t adc_state = ADC_IDLE;
@@ -450,8 +448,8 @@ uint16_t adc_pot_single(port p_adc[], unsigned adc_idx, adc_pot_state_t &adc_pot
     timer tmr_single;
 
     pot_timings_t pot_timings = {0};
-    adc_pot_startup(p_adc, adc_pot_state, pot_timings);
-    tmr_single :> pot_timings.time_trigger_charge; // Set origin time. This is the datum for the next few events.
+    adc_pot_init_timings(p_adc, adc_pot_state, pot_timings);
+    tmr_single :> pot_timings.time_trigger_charge; // Set origin time. This is the datum for the following events.
     do_adc_charge(p_adc, adc_idx, adc_pot_state, pot_timings);
     tmr_single when timerafter(pot_timings.time_trigger_start_convert) :> int _;
     do_adc_start_convert(p_adc, adc_idx, adc_pot_state, pot_timings);

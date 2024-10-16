@@ -29,7 +29,7 @@ void control_task(chanend c_adc){
             c_adc <: (uint32_t)ADC_CMD_POT_GET_DIR | ch;
             c_adc :> adc_dir[ch];
 
-            printf("%u: %u (%u), ", ch, adc[ch], adc_dir[ch]);
+            printf("ch %u: %u (%u), ", ch, adc[ch], adc_dir[ch]);
         }
         putchar('\n');
         delay_milliseconds(100);
@@ -61,9 +61,10 @@ void adc_pot_single_example(port p_adc[], adc_pot_state_t &adc_pot_state){
             tmr :> t0;
             adc[ch] = adc_pot_single(p_adc, ch, adc_pot_state);
             tmr :> t1;
-            printf("%u: %u (milliseconds: %d), ", ch, adc[ch], (t1 - t0) / XS1_TIMER_KHZ);
+            printf("ch %u: %u (microseconds: %d), ", ch, adc[ch], (t1 - t0) / XS1_TIMER_MHZ);
         }
         putchar('\n');
+        delay_milliseconds(100);
     }
 
 }
@@ -95,8 +96,10 @@ int main() {
             adc_pot_state_t adc_pot_state;
 
             uint16_t state_buffer[ADC_POT_STATE_SIZE(NUM_ADC, LUT_SIZE, FILTER_DEPTH)];
+
+            // Only use moving average filter if in continuous mode
             unsigned used_filter_depth = CONTINUOUS == 1 ? FILTER_DEPTH : 1;
-            adc_pot_init(NUM_ADC, LUT_SIZE, used_filter_depth, HYSTERESIS, state_buffer, adc_config, adc_pot_state);
+            adc_pot_init(p_adc, NUM_ADC, LUT_SIZE, used_filter_depth, HYSTERESIS, state_buffer, adc_config, adc_pot_state);
 
 #if (CONTINUOUS == 1)
             chan c_adc;
