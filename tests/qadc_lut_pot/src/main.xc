@@ -53,7 +53,8 @@ int main(unsigned argc, char * unsafe argv[argc]){
     adc_pot_state_t adc_pot_state;
 
     uint16_t state_buffer[ADC_POT_STATE_SIZE(NUM_ADC, LUT_SIZE, FILTER_DEPTH)];
-    adc_pot_init(NUM_ADC, LUT_SIZE, FILTER_DEPTH, HYSTERESIS, state_buffer, adc_config, adc_pot_state);
+    adc_pot_init(p_adc, NUM_ADC, LUT_SIZE, FILTER_DEPTH, HYSTERESIS, state_buffer, adc_config, adc_pot_state);
+
     par
     {
         adc_pot_task(c_adc, p_adc, adc_pot_state);
