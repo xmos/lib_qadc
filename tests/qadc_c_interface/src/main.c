@@ -6,23 +6,24 @@
 #include <print.h>
 
 
-#include "adc_pot.h"
-// #include "adc_rheo.h"
+#include "qadc.h"
 #include "filter_settings.h"
 
 
-port_t p_adc[] = {XS1_PORT_1A, XS1_PORT_1B};
+port_t p_adc_pot[] = {XS1_PORT_1A, XS1_PORT_1B};
+port_t p_adc_rheo[] = {XS1_PORT_1C, XS1_PORT_1D};
 
-DECLARE_JOB(client, (chanend_t));
-void client(chanend_t c_adc){
+DECLARE_JOB(client, (chanend_t, chanend_t));
+void client(chanend_t c_adc_pot, chanend_t c_adc_rheo){
     printstr("Client 0\n");
-    chan_out_word(c_adc, (uint32_t)ADC_CMD_POT_EXIT);
+    chan_out_word(c_adc_pot, (uint32_t)ADC_CMD_POT_EXIT);
+    chan_out_word(c_adc_rheo, (uint32_t)ADC_CMD_POT_EXIT);
     printstr("Client 1\n");
 }
 
 
 int main(void){
-    const adc_pot_config_t adc_config = {5000,
+    const qadc_config_t adc_config = {5000,
                                         47000,
                                         330,
                                         3.3,
@@ -30,22 +31,30 @@ int main(void){
                                         1 * XS1_TIMER_KHZ,
                                         1};
 
-    channel_t c_adc = chan_alloc();
+    channel_t c_adc_pot = chan_alloc();
+    channel_t c_adc_rheo = chan_alloc();
 
-    port_enable(p_adc[0]);
-    port_enable(p_adc[1]);
+    for(int i = 0; i < NUM_ADC; i++){
+        port_enable(p_adc_pot[i]);
+        port_enable(p_adc_rheo[i]);
+    }
 
-    adc_pot_state_t adc_pot_state;
+    qadc_pot_state_t adc_pot_state;
+    qadc_rheo_state_t adc_rheo_state;
 
-    uint16_t state_buffer[ADC_POT_STATE_SIZE(NUM_ADC, LUT_SIZE, FILTER_DEPTH)];
+    uint16_t state_buffer_pot[QADC_POT_STATE_SIZE(NUM_ADC, LUT_SIZE, FILTER_DEPTH)];
+    uint16_t state_buffer_rheo[QADC_RHEO_STATE_SIZE(NUM_ADC, FILTER_DEPTH)];
 
     printstr("Init 0\n");
-    adc_pot_init(p_adc, NUM_ADC, LUT_SIZE, FILTER_DEPTH, HYSTERESIS, state_buffer, adc_config, &adc_pot_state);
+    qadc_pot_init(p_adc_pot, NUM_ADC, LUT_SIZE, FILTER_DEPTH, HYSTERESIS, state_buffer_pot, adc_config, &adc_pot_state);
     printstr("Init 1\n");
+    qadc_rheo_init(p_adc_rheo, NUM_ADC, 1024, FILTER_DEPTH, HYSTERESIS, state_buffer_rheo, adc_config, &adc_rheo_state);
+    printstr("Init 2\n");
 
     PAR_JOBS(
-        PJOB(adc_pot_task, (c_adc.end_a, p_adc, &adc_pot_state)),
-        PJOB(client, (c_adc.end_b))
+        PJOB(qadc_pot_task, (c_adc_pot.end_a, p_adc_pot, &adc_pot_state)),
+        PJOB(qadc_rheo_task, (c_adc_pot.end_a, p_adc_rheo, &adc_rheo_state)),
+        PJOB(client, (c_adc_pot.end_b, c_adc_rheo.end_b))
     );
 
     printstr("Fin\n");

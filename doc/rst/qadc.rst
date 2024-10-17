@@ -279,24 +279,35 @@ When infrequent conversions are made using ``single shot`` mode it is recommende
      - Continuous
      - Single
 
-QADC Rheostat API
------------------
+QADC API
+--------
 
-.. doxygenstruct:: adc_rheo_config_t
+Common items for both types of QADC are shown here.
+
+.. doxygenstruct:: qadc_config_t
     :members:
 
-.. doxygenstruct:: adc_rheo_state_t
+.. doxygengroup:: lib_qadc_common
+   :content-only:
+
+
+QADC Rheostat API
+.................
+
+Common items for the Rheostat QADC are shown here.
+
+.. doxygenstruct:: qadc_rheo_state_t
 
 .. doxygengroup:: lib_qadc_rheo_reader
    :content-only:
 
 QADC Potentiometer API
-----------------------
+......................
 
-.. doxygenstruct:: adc_pot_config_t
-    :members:
+Common items for the Potentiometer QADC are shown here.
 
-.. doxygenstruct:: adc_pot_state_t
+
+.. doxygenstruct:: qadc_pot_state_t
 
 .. doxygengroup:: lib_qadc_pot_reader
    :content-only:

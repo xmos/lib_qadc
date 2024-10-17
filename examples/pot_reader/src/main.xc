@@ -5,7 +5,7 @@
 #include <xs1.h>
 #include <stdio.h>
 
-#include "adc_pot.h"
+#include "qadc.h"
 
 #define NUM_ADC             2
 #define LUT_SIZE            1024
@@ -59,7 +59,7 @@ void control_task(chanend ?c_adc, uint16_t * unsafe result_ptr){
     }
 }
 
-void adc_pot_single_example(port p_adc[], adc_pot_state_t &adc_pot_state){
+void qadc_pot_single_example(port p_adc[], qadc_pot_state_t &adc_pot_state){
     printf("Running QADC in single shot mode using function call!\n");
 
     int t0, t1; // For timing the ADC read
@@ -72,7 +72,7 @@ void adc_pot_single_example(port p_adc[], adc_pot_state_t &adc_pot_state){
         for(unsigned ch = 0; ch < NUM_ADC; ch++){
             // This blocks until the conversion is complete
             tmr :> t0;
-            adc[ch] = adc_pot_single(p_adc, ch, adc_pot_state);
+            adc[ch] = qadc_pot_single(p_adc, ch, adc_pot_state);
             tmr :> t1;
             printf("ch %u: %u (microseconds: %d), ", ch, adc[ch], (t1 - t0) / XS1_TIMER_MHZ);
         }
@@ -96,20 +96,20 @@ int main() {
 
             const unsigned convert_interval_ticks = (1 * XS1_TIMER_KHZ); // 1 millisecond
             
-            const adc_pot_config_t adc_config = {capacitor_pf,
+            const qadc_config_t adc_config = {capacitor_pf,
                                                 potentiometer_ohms,
                                                 resistor_series_ohms,
                                                 v_rail,
                                                 v_thresh,
                                                 convert_interval_ticks,
                                                 auto_scale};
-            adc_pot_state_t adc_pot_state;
+            qadc_pot_state_t adc_pot_state;
 
-            uint16_t state_buffer[ADC_POT_STATE_SIZE(NUM_ADC, LUT_SIZE, FILTER_DEPTH)];
+            uint16_t state_buffer[QADC_POT_STATE_SIZE(NUM_ADC, LUT_SIZE, FILTER_DEPTH)];
 
             // Only use moving average filter if in continuous mode
             unsigned used_filter_depth = (CONTINUOUS == 1) ? FILTER_DEPTH : 1;
-            adc_pot_init(p_adc, NUM_ADC, LUT_SIZE, used_filter_depth, HYSTERESIS, state_buffer, adc_config, adc_pot_state);
+            qadc_pot_init(p_adc, NUM_ADC, LUT_SIZE, used_filter_depth, HYSTERESIS, state_buffer, adc_config, adc_pot_state);
 
 #if (CONTINUOUS == 1)
 // The continuous mode allows for a shared memory interface if the QADC is on the same tile.
@@ -119,7 +119,7 @@ int main() {
 
                 par
                 {
-                    adc_pot_task(NULL, p_adc, adc_pot_state);
+                    qadc_pot_task(NULL, p_adc, adc_pot_state);
                     control_task(NULL, result_ptr);
                 }
             }
@@ -128,12 +128,12 @@ int main() {
 
             par
             {
-                adc_pot_task(c_adc, p_adc, adc_pot_state);
+                qadc_pot_task(c_adc, p_adc, adc_pot_state);
                 control_task(c_adc, NULL);
             }
 #endif // USE_SHARED_MEMORY
 #else
-            adc_pot_single_example(p_adc, adc_pot_state);
+            qadc_pot_single_example(p_adc, adc_pot_state);
 #endif // (CONTINUOUS == 1)
         }
     }

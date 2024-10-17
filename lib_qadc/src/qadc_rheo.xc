@@ -10,8 +10,8 @@
 #include <platform.h>
 #include <print.h>
 
-#include "adc_rheo.h"
-#include "adc_utils.h"
+#include "qadc.h"
+#include "qadc_utils.h"
 
 #define debprintf(...) printf(...) 
 
@@ -76,12 +76,12 @@ static inline uint16_t post_process_result( uint16_t discharge_elapsed_time,
         if(zero_offsetted_ticks > max_seen_ticks[adc_idx]){
             max_seen_ticks[adc_idx] = zero_offsetted_ticks;
             // Scale here if using calib
-            // max_scale[adc_idx] = max_seen_ticks[adc_idx] << Q_3_13_SHIFT / max_discharge_period_ticks or something
+            // max_scale[adc_idx] = max_seen_ticks[adc_idx] << QADC_Q_3_13_SHIFT / max_discharge_period_ticks or something
         }
         printf("max_seen: %u\n", max_seen_ticks[adc_idx]);
 
         // TODO scale to max or just use max seen and remove max_scale?
-        // ticks = ((int64_t)max_scale_up * (int64_t)ticks) >> Q_3_13_SHIFT;
+        // ticks = ((int64_t)max_scale_up * (int64_t)ticks) >> QADC_Q_3_13_SHIFT;
 
         // Clip positive
         if(zero_offsetted_ticks > max_discharge_period_ticks){
@@ -129,15 +129,16 @@ static inline uint16_t post_process_result( uint16_t discharge_elapsed_time,
 // }
 
 
-void adc_rheo_init( size_t num_adc,
+void qadc_rheo_init( port p_adc[],
+                    size_t num_adc,
                     size_t adc_steps, 
                     size_t filter_depth,
                     unsigned result_hysteresis,
                     uint16_t *state_buffer,
-                    adc_rheo_config_t adc_config,
-                    adc_rheo_state_t &adc_rheo_state) {
+                    qadc_config_t adc_config,
+                    qadc_rheo_state_t &adc_rheo_state) {
     unsafe{
-        memset(state_buffer, 0, ADC_RHEO_STATE_SIZE(num_adc, filter_depth));
+        memset(state_buffer, 0, QADC_RHEO_STATE_SIZE(num_adc, filter_depth) * sizeof(uint16_t));
 
         adc_rheo_state.num_adc = num_adc;
         adc_rheo_state.filter_depth = filter_depth;
@@ -188,19 +189,19 @@ void adc_rheo_init( size_t num_adc,
         adc_rheo_state.max_scale = ptr;
         ptr += num_adc;
 
-        unsigned limit = (unsigned)state_buffer + sizeof(uint16_t) * ADC_RHEO_STATE_SIZE(num_adc, filter_depth);
+        unsigned limit = (unsigned)state_buffer + sizeof(uint16_t) * QADC_RHEO_STATE_SIZE(num_adc, filter_depth);
         assert(ptr == limit);
 
         // Set scale and clear tide marks
         for(int i = 0; i < num_adc; i++){
-            adc_rheo_state.max_scale[i] = 1 << Q_3_13_SHIFT;
+            adc_rheo_state.max_scale[i] = 1 << QADC_Q_3_13_SHIFT;
             adc_rheo_state.max_seen_ticks[i] = 0;
         }
     }
 }
 
 
-void adc_rheo_task(chanend c_adc, port p_adc[], adc_rheo_state_t &adc_rheo_state){
+void qadc_rheo_task(chanend c_adc, port p_adc[], qadc_rheo_state_t &adc_rheo_state){
     printf("adc_rheo_task\n");
   
     // Current conversion index

@@ -9,8 +9,8 @@
 #include <platform.h>
 #include <print.h>
 
-#include "adc_pot.h"
-#include "adc_utils.h"
+#include "qadc.h"
+#include "qadc_utils.h"
 
 
 
@@ -21,16 +21,16 @@ typedef enum adc_state_t{
         ADC_CONVERTING = 0 // Optimisation as ISA can do != 0 on select guard
 }adc_state_t;
 
-void adc_pot_init(  port p_adc[], 
+void qadc_pot_init( port p_adc[], 
                     size_t num_adc,
                     size_t lut_size,
                     size_t filter_depth,
                     unsigned result_hysteresis,
                     uint16_t *state_buffer,
-                    adc_pot_config_t adc_config,
-                    adc_pot_state_t &adc_pot_state) {
+                    qadc_config_t adc_config,
+                    qadc_pot_state_t &adc_pot_state) {
     unsafe{
-        memset(state_buffer, 0, ADC_POT_STATE_SIZE(num_adc, lut_size, filter_depth) * sizeof(uint16_t));
+        memset(state_buffer, 0, QADC_POT_STATE_SIZE(num_adc, lut_size, filter_depth) * sizeof(uint16_t));
 
         adc_pot_state.num_adc = num_adc;
         adc_pot_state.lut_size = lut_size;
@@ -72,13 +72,13 @@ void adc_pot_init(  port p_adc[],
         ptr += lut_size;
         adc_pot_state.filter_write_idx = ptr;
         ptr += num_adc;
-        unsigned limit = (unsigned)state_buffer + sizeof(uint16_t) * ADC_POT_STATE_SIZE(num_adc, lut_size, filter_depth);
+        unsigned limit = (unsigned)state_buffer + sizeof(uint16_t) * QADC_POT_STATE_SIZE(num_adc, lut_size, filter_depth);
         assert(ptr == limit); // Check we have matching sizes
 
         // Set scale and clear tide marks
         for(int i = 0; i < num_adc; i++){
-            adc_pot_state.max_scale_up[i] = 1 << Q_3_13_SHIFT;
-            adc_pot_state.max_scale_down[i] = 1 << Q_3_13_SHIFT;
+            adc_pot_state.max_scale_up[i] = 1 << QADC_Q_3_13_SHIFT;
+            adc_pot_state.max_scale_down[i] = 1 << QADC_Q_3_13_SHIFT;
             adc_pot_state.max_seen_ticks_up[i] = 0;
             adc_pot_state.max_seen_ticks_down[i] = 0;
         }
@@ -102,7 +102,7 @@ void adc_pot_init(  port p_adc[],
 }
 
 
-static inline unsigned ticks_to_position(int is_up, uint16_t ticks, unsigned adc_idx, adc_pot_state_t &adc_pot_state){
+static inline unsigned ticks_to_position(int is_up, uint16_t ticks, unsigned adc_idx, qadc_pot_state_t &adc_pot_state){
     unsafe{
 
         // Extract vars for readibility
@@ -110,8 +110,8 @@ static inline unsigned ticks_to_position(int is_up, uint16_t ticks, unsigned adc
         uint16_t * unsafe down = adc_pot_state.cal_down;
         unsigned num_points = adc_pot_state.lut_size;
         unsigned port_time_offset = adc_pot_state.port_time_offset;
-        q3_13_fixed_t max_scale_up = adc_pot_state.max_scale_up[adc_idx];
-        q3_13_fixed_t max_scale_down = adc_pot_state.max_scale_down[adc_idx];
+        qadc_q3_13_fixed_t max_scale_up = adc_pot_state.max_scale_up[adc_idx];
+        qadc_q3_13_fixed_t max_scale_down = adc_pot_state.max_scale_down[adc_idx];
 
         unsigned max_arg = 0;
 
@@ -124,8 +124,8 @@ static inline unsigned ticks_to_position(int is_up, uint16_t ticks, unsigned adc
 
         if(is_up){
             //Apply scaling (for best adjusting crossover smoothness)
-            ticks = (uint32_t)ticks << Q_3_13_SHIFT / max_scale_up;
-            // ticks = ((int64_t)max_scale_up * (int64_t)ticks) >> Q_3_13_SHIFT;
+            ticks = (uint32_t)ticks << QADC_Q_3_13_SHIFT / max_scale_up;
+            // ticks = ((int64_t)max_scale_up * (int64_t)ticks) >> QADC_Q_3_13_SHIFT;
             
             uint16_t max = 0;
             max_arg = num_points - 1;
@@ -139,8 +139,8 @@ static inline unsigned ticks_to_position(int is_up, uint16_t ticks, unsigned adc
             }
         } else {
             //Apply scaling (for best adjusting crossover smoothness)
-            ticks = (uint32_t)ticks << Q_3_13_SHIFT / max_scale_down;
-            // ticks = ((int64_t)max_scale_down * (int64_t)ticks) >> Q_3_13_SHIFT;
+            ticks = (uint32_t)ticks << QADC_Q_3_13_SHIFT / max_scale_down;
+            // ticks = ((int64_t)max_scale_down * (int64_t)ticks) >> QADC_Q_3_13_SHIFT;
 
             int16_t max = 0;
             for(int i = 0; i < num_points; i++){
@@ -158,7 +158,7 @@ static inline unsigned ticks_to_position(int is_up, uint16_t ticks, unsigned adc
 }
 
 
-static inline uint16_t post_process_result( uint16_t raw_result, unsigned adc_idx, adc_pot_state_t &adc_pot_state){
+static inline uint16_t post_process_result( uint16_t raw_result, unsigned adc_idx, qadc_pot_state_t &adc_pot_state){
     unsafe{
         // Extract vars for readibility
         uint16_t *unsafe conversion_history = adc_pot_state.conversion_history;
@@ -216,7 +216,7 @@ typedef struct pot_timings_t{
 }pot_timings_t;
 
 
-void do_adc_charge(port p_adc[], unsigned adc_idx, adc_pot_state_t &adc_pot_state, pot_timings_t &pot_timings){
+void do_adc_charge(port p_adc[], unsigned adc_idx, qadc_pot_state_t &adc_pot_state, pot_timings_t &pot_timings){
     unsafe{
         p_adc[adc_idx] :> adc_pot_state.init_port_val[adc_idx];
         unsigned is_up = adc_pot_state.init_port_val[adc_idx];
@@ -225,20 +225,20 @@ void do_adc_charge(port p_adc[], unsigned adc_idx, adc_pot_state_t &adc_pot_stat
 
         p_adc[adc_idx] <: is_up ^ 0x1; // Drive opposite to what we read to "charge"
         pot_timings.max_ticks_expected = is_up != 0 ? 
-                            ((uint32_t)adc_pot_state.max_lut_ticks_up * (uint32_t)adc_pot_state.max_scale_up[adc_idx]) >> Q_3_13_SHIFT :
-                            ((uint32_t)adc_pot_state.max_lut_ticks_down * (uint32_t)adc_pot_state.max_scale_down[adc_idx]) >> Q_3_13_SHIFT;
+                            ((uint32_t)adc_pot_state.max_lut_ticks_up * (uint32_t)adc_pot_state.max_scale_up[adc_idx]) >> QADC_Q_3_13_SHIFT :
+                            ((uint32_t)adc_pot_state.max_lut_ticks_down * (uint32_t)adc_pot_state.max_scale_down[adc_idx]) >> QADC_Q_3_13_SHIFT;
 
     }
 }
 
-void do_adc_start_convert(port p_adc[], unsigned adc_idx, adc_pot_state_t &adc_pot_state, pot_timings_t &pot_timings){
+void do_adc_start_convert(port p_adc[], unsigned adc_idx, qadc_pot_state_t &adc_pot_state, pot_timings_t &pot_timings){
     p_adc[adc_idx] :> int _ @ pot_timings.start_time; // Make Hi Z and grab port time
     // Set up an event to handle if port doesn't reach oppositie value. Set at double the max expected time. This is a fairly fatal 
     // event which is caused by severe mismatch of hardware vs init params
     pot_timings.time_trigger_overshoot = pot_timings.time_trigger_start_convert + (pot_timings.max_ticks_expected * 2);
 }
 
-void do_adc_convert(port p_adc[], unsigned adc_idx, adc_pot_state_t &adc_pot_state, pot_timings_t &pot_timings){
+void do_adc_convert(port p_adc[], unsigned adc_idx, qadc_pot_state_t &adc_pot_state, pot_timings_t &pot_timings){
     unsafe{
         int32_t conversion_time = (pot_timings.end_time - pot_timings.start_time);
         if(conversion_time < 0){
@@ -262,11 +262,11 @@ void do_adc_convert(port p_adc[], unsigned adc_idx, adc_pot_state_t &adc_pot_sta
             dprintf("soft overshoot: %d (%d)\n", conversion_time, pot_timings.max_ticks_expected);
             if(adc_pot_state.adc_config.auto_scale){
                 if(is_up){ // is up
-                    q3_13_fixed_t new_scale = ((uint32_t)adc_pot_state.max_scale_up[adc_idx] * (uint32_t)conversion_time) / (uint32_t)pot_timings.max_ticks_expected;
+                    qadc_q3_13_fixed_t new_scale = ((uint32_t)adc_pot_state.max_scale_up[adc_idx] * (uint32_t)conversion_time) / (uint32_t)pot_timings.max_ticks_expected;
                     dprintf("up scale: %d (%d)\n", adc_pot_state.max_scale_up[adc_idx], new_scale);
                     adc_pot_state.max_scale_up[adc_idx] = new_scale;
                 } else {
-                    q3_13_fixed_t new_scale = ((uint32_t)adc_pot_state.max_scale_down[adc_idx] * (uint32_t)conversion_time) / (uint32_t)pot_timings.max_ticks_expected;
+                    qadc_q3_13_fixed_t new_scale = ((uint32_t)adc_pot_state.max_scale_down[adc_idx] * (uint32_t)conversion_time) / (uint32_t)pot_timings.max_ticks_expected;
                     dprintf("down scale: %d (%d)\n", adc_pot_state.max_scale_down[adc_idx], new_scale);
                     adc_pot_state.max_scale_down[adc_idx] = new_scale;
                 }                             
@@ -300,7 +300,7 @@ void do_adc_convert(port p_adc[], unsigned adc_idx, adc_pot_state_t &adc_pot_sta
 }
 
 
-void do_adc_handle_overshoot(port p_adc[], unsigned adc_idx, adc_pot_state_t &adc_pot_state, pot_timings_t &pot_timings){
+void do_adc_handle_overshoot(port p_adc[], unsigned adc_idx, qadc_pot_state_t &adc_pot_state, pot_timings_t &pot_timings){
     unsigned overshoot_port_val = 0;
     p_adc[adc_idx] :> overshoot_port_val; // For debug only.
 
@@ -324,7 +324,7 @@ void do_adc_handle_overshoot(port p_adc[], unsigned adc_idx, adc_pot_state_t &ad
 }
 
 
-void do_adc_timing_init(port p_adc[], adc_pot_state_t &adc_pot_state, pot_timings_t &pot_timings){
+void do_adc_timing_init(port p_adc[], qadc_pot_state_t &adc_pot_state, pot_timings_t &pot_timings){
     // Work out timing limits
     const unsigned capacitor_pf = adc_pot_state.adc_config.capacitor_pf;
     const unsigned potentiometer_ohms = adc_pot_state.adc_config.potentiometer_ohms;
@@ -341,7 +341,7 @@ void do_adc_timing_init(port p_adc[], adc_pot_state_t &adc_pot_state, pot_timing
 
 }
 
-void adc_pot_task(chanend ?c_adc, port p_adc[], adc_pot_state_t &adc_pot_state){
+void qadc_pot_task(chanend ?c_adc, port p_adc[], qadc_pot_state_t &adc_pot_state){
     dprintf("adc_pot_task\n");
   
     // Current conversion index
@@ -434,7 +434,7 @@ void adc_pot_task(chanend ?c_adc, port p_adc[], adc_pot_state_t &adc_pot_state){
 }
 
 
-uint16_t adc_pot_single(port p_adc[], unsigned adc_idx, adc_pot_state_t &adc_pot_state){
+uint16_t qadc_pot_single(port p_adc[], unsigned adc_idx, qadc_pot_state_t &adc_pot_state){
     int16_t result = 0;
 
     timer tmr_single;

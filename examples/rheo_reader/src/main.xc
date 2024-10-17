@@ -5,7 +5,7 @@
 #include <xs1.h>
 #include <stdio.h>
 
-#include "adc_rheo.h"
+#include "qadc.h"
 
 #define NUM_ADC         1
 #define FILTER_DEPTH    32
@@ -52,7 +52,7 @@ int main() {
 
             const unsigned convert_interval_ticks = (50 * XS1_TIMER_KHZ);
             
-            const adc_rheo_config_t adc_config = {capacitor_pf,
+            const qadc_config_t adc_config = {capacitor_pf,
                                                 potentiometer_ohms,
                                                 resistor_series_ohms,
                                                 v_rail,
@@ -60,13 +60,13 @@ int main() {
                                                 convert_interval_ticks,
                                                 auto_scale};
 
-            adc_rheo_state_t adc_rheo_state;
-            uint16_t state_buffer[ADC_RHEO_STATE_SIZE(NUM_ADC, FILTER_DEPTH)];
-            adc_rheo_init(NUM_ADC, NUM_STEPS, FILTER_DEPTH, HYSTERESIS, state_buffer, adc_config, adc_rheo_state);
+            qadc_rheo_state_t adc_rheo_state;
+            uint16_t state_buffer[QADC_RHEO_STATE_SIZE(NUM_ADC, FILTER_DEPTH)];
+            qadc_rheo_init(p_adc, NUM_ADC, NUM_STEPS, FILTER_DEPTH, HYSTERESIS, state_buffer, adc_config, adc_rheo_state);
             
             par
             {
-                adc_rheo_task(c_adc, p_adc, adc_rheo_state);
+                qadc_rheo_task(c_adc, p_adc, adc_rheo_state);
                 control_task(c_adc);
             }
         }

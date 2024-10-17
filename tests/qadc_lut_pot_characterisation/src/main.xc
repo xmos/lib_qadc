@@ -7,7 +7,7 @@
 #include <xs1.h>
 #include <stdio.h>
 
-#include "adc_pot.h"
+#include "qadc.h"
 #include "i2c.h"
 #include "xassert.h"
 
@@ -164,21 +164,21 @@ int main() {
         on tile[1]:{
             chan c_adc;
             
-            const adc_pot_config_t adc_config = {capacitor_pf,
+            const qadc_config_t adc_config = {capacitor_pf,
                                                 potentiometer_ohms,
                                                 resistor_series_ohms,
                                                 v_rail,
                                                 v_thresh,
                                                 convert_interval_ticks,
                                                 auto_scale};
-            adc_pot_state_t adc_pot_state;
+            qadc_pot_state_t adc_pot_state;
 
-            uint16_t state_buffer[ADC_POT_STATE_SIZE(NUM_ADC, LUT_SIZE, FILTER_DEPTH)];
-            adc_pot_init(p_adc, NUM_ADC, LUT_SIZE, FILTER_DEPTH, HYSTERESIS, state_buffer, adc_config, adc_pot_state);
+            uint16_t state_buffer[QADC_POT_STATE_SIZE(NUM_ADC, LUT_SIZE, FILTER_DEPTH)];
+            qadc_pot_init(p_adc, NUM_ADC, LUT_SIZE, FILTER_DEPTH, HYSTERESIS, state_buffer, adc_config, adc_pot_state);
 
             par
             {
-                adc_pot_task(c_adc, p_adc, adc_pot_state);
+                qadc_pot_task(c_adc, p_adc, adc_pot_state);
                 control_task(c_adc, i2c[0]);
             }
             printf("FINISHED!!\n");

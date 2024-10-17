@@ -4,6 +4,8 @@
 #ifndef __ADC_UTILS__
 #define __ADC_UTILS__
 
+#include <stdint.h>
+
 // #define dprintf(...) printf(__VA_ARGS__) 
 #define dprintf(...) 
 

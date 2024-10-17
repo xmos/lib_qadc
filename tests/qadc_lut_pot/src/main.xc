@@ -7,14 +7,14 @@
 #include <stdlib.h>
 
 
-#include "adc_pot.h"
+#include "qadc.h"
 #include "filter_settings.h"
 
 
 on tile[0]: port p_adc[] = {XS1_PORT_1A, XS1_PORT_1D}; // Sets which pins are to be used (channels 0..n)  // X0D00, 11;
 
 
-void parse_cmd_line(adc_pot_config_t &adc_config, unsigned argc, char * unsafe argv[argc])
+void parse_cmd_line(qadc_config_t &adc_config, unsigned argc, char * unsafe argv[argc])
 {
     for(int i = 1; i < argc; i++){
         printf("Arg %u: %s\n", i, argv[i]);
@@ -43,21 +43,21 @@ void parse_cmd_line(adc_pot_config_t &adc_config, unsigned argc, char * unsafe a
 
 int main(unsigned argc, char * unsafe argv[argc]){
 
-    adc_pot_config_t adc_config;
+    qadc_config_t adc_config;
     parse_cmd_line(adc_config, argc, argv);
     adc_config.convert_interval_ticks = (1 * XS1_TIMER_KHZ);
     adc_config.auto_scale = 0;
 
     chan c_adc;
 
-    adc_pot_state_t adc_pot_state;
+    qadc_pot_state_t adc_pot_state;
 
-    uint16_t state_buffer[ADC_POT_STATE_SIZE(NUM_ADC, LUT_SIZE, FILTER_DEPTH)];
-    adc_pot_init(p_adc, NUM_ADC, LUT_SIZE, FILTER_DEPTH, HYSTERESIS, state_buffer, adc_config, adc_pot_state);
+    uint16_t state_buffer[QADC_POT_STATE_SIZE(NUM_ADC, LUT_SIZE, FILTER_DEPTH)];
+    qadc_pot_init(p_adc, NUM_ADC, LUT_SIZE, FILTER_DEPTH, HYSTERESIS, state_buffer, adc_config, adc_pot_state);
 
     par
     {
-        adc_pot_task(c_adc, p_adc, adc_pot_state);
+        qadc_pot_task(c_adc, p_adc, adc_pot_state);
         {
             c_adc <: (uint32_t)ADC_CMD_POT_EXIT;
         }

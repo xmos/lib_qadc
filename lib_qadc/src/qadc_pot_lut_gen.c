@@ -3,11 +3,10 @@
 
 #include <math.h>
 #include <stdio.h>
-#include <stdint.h>
 #include <string.h>
 #include <assert.h>
 #include <platform.h>
-#include "adc_utils.h"
+#include "qadc_utils.h"
 
 void gen_lookup_pot(uint16_t * up, uint16_t * down, unsigned num_points,
                     float r_ohms, float capacitor_f, float rs_ohms,
