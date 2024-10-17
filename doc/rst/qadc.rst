@@ -305,6 +305,8 @@ QADC Potentiometer API
 Building and running the examples
 ---------------------------------
 
+The examples are designed to run on the ``XK-EVK-XU316`` (XCORE-AI-EXPLORER) kit although any xcore.ai hardware will work (please adjust the QADC ports accordingly).
+
 Ensure a correctly configured installation of the XMOS tools and open an XTC command shell. Please check that the XMOS tools are correctly
 sourced by running the following command::
 
@@ -333,7 +335,7 @@ Next ensure you have adjusted the relevant paramters for your design:
 
 
 
-Run the following commands in the lib_sw_pll/examples directory to build the firmware.
+Run the following commands in the lib_sw_pll/examples directory to build the firmware::
 
     cmake -B build -G "Unix Makefiles"
     xmake -j -C build

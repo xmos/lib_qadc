@@ -3,7 +3,7 @@ include($ENV{XMOS_CMAKE_PATH}/xcommon.cmake)
 
 project(qadc_pot_example)
 
-set(APP_HW_TARGET XCORE-AI-EXPLORER)
+set(APP_HW_TARGET XK-EVK-XU316)
 set(APP_DEPENDENT_MODULES               lib_qadc)
 
 set(COMMON_COMPILER_FLAGS               -Os
