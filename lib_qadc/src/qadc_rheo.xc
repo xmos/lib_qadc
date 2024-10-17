@@ -79,7 +79,7 @@ static inline uint16_t post_process_result( uint16_t discharge_elapsed_time,
             // Scale here if using calib
             // max_scale[adc_idx] = max_seen_ticks[adc_idx] << QADC_Q_3_13_SHIFT / max_discharge_period_ticks or something
         }
-        printf("max_seen: %u\n", max_seen_ticks[adc_idx]);
+        dprintf("max_seen: %u\n", max_seen_ticks[adc_idx]);
 
         // TODO scale to max or just use max seen and remove max_scale?
         // ticks = ((int64_t)max_scale_up * (int64_t)ticks) >> QADC_Q_3_13_SHIFT;
@@ -198,13 +198,20 @@ void qadc_rheo_init( port p_adc[],
             adc_rheo_state.max_scale[i] = 1 << QADC_Q_3_13_SHIFT;
             adc_rheo_state.max_seen_ticks[i] = 0;
         }
+
+        // Set all ports to input and set drive strength to low to reduce switching noise
+        const int port_drive = DRIVE_2MA;
+        for(int i = 0; i < num_adc; i++){
+            unsigned dummy;
+            p_adc[i] :> dummy;
+            // Simulator doesn't like setc so only do for hardware. isSimulation() takes 100ms or so per port so do here.
+            if(!isSimulation()) set_pad_properties(p_adc[i], port_drive, PULL_NONE, 1, 0);
+        }
     }
 }
 
 
 void qadc_rheo_task(chanend c_adc, port p_adc[], qadc_rheo_state_t &adc_rheo_state){
-    printf("adc_rheo_task\n");
-  
     // Current conversion index
     unsigned adc_idx = 0;
     adc_mode_t adc_mode = ADC_CONVERT;
@@ -232,7 +239,7 @@ void qadc_rheo_task(chanend c_adc, port p_adc[], qadc_rheo_state_t &adc_rheo_sta
     const uint32_t max_charge_period_ticks = ((uint64_t)rc_times_to_charge_fully * capacitor_pf * resistor_series_ohms) / 10000;
 
     assert(convert_interval_ticks > max_charge_period_ticks + adc_rheo_state.max_disch_ticks * 2); // Ensure conversion rate is low enough. *2 to allow post processing time
-    printf("max_charge_period_ticks: %lu max_discharge_period_ticks: %lu\n", max_charge_period_ticks, adc_rheo_state.max_disch_ticks);
+    dprintf("max_charge_period_ticks: %lu max_discharge_period_ticks: %lu\n", max_charge_period_ticks, adc_rheo_state.max_disch_ticks);
 
 
  
@@ -286,7 +293,7 @@ void qadc_rheo_task(chanend c_adc, port p_adc[], qadc_rheo_state_t &adc_rheo_sta
                                                                 adc_mode);
                 unsafe{adc_rheo_state.results[adc_idx] = post_proc_result;}
                 tmr_charge :> t1; 
-                printf("ticks: %u post_proc: %u: proc_ticks: %d\n", conversion_time, post_proc_result, t1-t0);
+                dprintf("ticks: %u post_proc: %u: proc_ticks: %d\n", conversion_time, post_proc_result, t1-t0);
 
 
                 if(++adc_idx == adc_rheo_state.num_adc){
@@ -297,10 +304,10 @@ void qadc_rheo_task(chanend c_adc, port p_adc[], qadc_rheo_state_t &adc_rheo_sta
                 adc_state = ADC_IDLE;
             break;
 
-            case (adc_state == ADC_CONVERTING || adc_state == ADC_STOPPED)=> tmr_overshoot when timerafter(time_trigger_overshoot) :> int _:
+            case (adc_state == ADC_CONVERTING) => tmr_overshoot when timerafter(time_trigger_overshoot) :> int _:
                 p_adc[adc_idx] :> int _ @ end_time;
                 unsafe{adc_rheo_state.results[adc_idx] = adc_rheo_state.adc_steps - 1;}
-                printf("ticks: %u overshoot \n", end_time - start_time);
+                dprintf("ticks: %u overshoot \n", end_time - start_time);
                 if(++adc_idx == adc_rheo_state.num_adc){
                     adc_idx = 0;
                 }
@@ -309,11 +316,10 @@ void qadc_rheo_task(chanend c_adc, port p_adc[], qadc_rheo_state_t &adc_rheo_sta
                 adc_state = ADC_IDLE;
             break;
 
-            case c_adc :> uint32_t command:
+            case (adc_state == ADC_CHARGING || adc_state == ADC_STOPPED) => c_adc :> uint32_t command:
                 switch(command & QADC_CMD_MASK){
                     case QADC_CMD_READ:
                         uint32_t ch = command & (~QADC_CMD_MASK);
-                        printf("read ch: %lu \n", ch);
                         unsafe{c_adc <: (uint32_t)adc_rheo_state.results[ch];}
                     break;
                     case QADC_CMD_STOP_CONV:
