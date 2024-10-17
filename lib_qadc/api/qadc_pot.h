@@ -111,9 +111,9 @@ void qadc_pot_init(  port p_adc[],
  * and the callee can accept a blocking call.
  * qadc_pot_init() must be called before this function.
  *
- * \param p_adc         An array of 1 bit ports used for conversion.
- * \param adc_idx       The QADC channel to read.
- * \param adc_pot_state Reference to the adc_pot_state_t struct which contains internal state for the QADC. 
+ * \param p_adc          An array of 1 bit ports used for conversion.
+ * \param adc_idx        The QADC channel to read.
+ * \param qadc_pot_state Reference to the qadc_pot_state_t struct which contains internal state for the QADC. 
  */ 
 uint16_t qadc_pot_single(port p_adc[], unsigned adc_idx, REFERENCE_PARAM(qadc_pot_state_t, qadc_pot_state));
 
@@ -123,7 +123,7 @@ void qadc_pot_task(NULLABLE_RESOURCE(chanend, c_adc), port p_adc[], REFERENCE_PA
 DECLARE_JOB(qadc_pot_task, (chanend_t, port_t*, qadc_pot_state_t*));
 /**
  * Starts a task that will continuously cycle through all QADC inputs and convert each in turn. It will assert if
- * the time taken to convert is longer than convert_interval_ticks set in adc_config.
+ * the time taken to convert is longer than convert_interval_ticks set in qadc_config.
  * The task will apply post processing to the raw result including filtering and hysteresis.
  * 
  * The task may be placed on a different tile from the client if channel communication is used.

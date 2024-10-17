@@ -16,14 +16,6 @@
 #endif
 
 
-/**
- * \addtogroup lib_qadc_common
- *
- * The public API for using the QADC.
- * @{
- */
-
-
 /** 
  * @brief   Configuration structure for initialising the QADC. This contains
  *          the passive component definition, voltages, conversion speed ( adc_xxx_task() only ) 
@@ -48,6 +40,13 @@ typedef struct qadc_config_t{
      *  This is ignored in single shot mode. */ 
     char auto_scale;
 }qadc_config_t;
+
+/**
+ * \addtogroup lib_qadc_common
+ *
+ * The public API for using the QADC.
+ * @{
+ */
 
 /** 
  * @brief   Fixed point type used internally by QADC.

@@ -64,7 +64,7 @@ Noise is always a concern in the analog domain and the QADC is no different. In 
 
 
 Rheostat Reader
----------------
+...............
 
 The rheostat reader uses just two terminals of a potentiometer and treats it as variable resistor (rheostat). The scheme works as follows:
 
@@ -81,7 +81,7 @@ The rheostat reader uses just two terminals of a potentiometer and treats it as 
 .. figure:: images/qadc_rheo_schem.pdf
    :width: 80%
 
-   QADC Rehostat Circuit
+   QADC Rheostat Circuit
 
 
 The rheostat reader offers excellent linearity however it suffers from full scale setting accuracy if the passive components have large tolerances. This may result, for example with 20% tolerances, in full scale being read at 80% (and beyond) of the travel or only 80% being registered at the end of the travel.
@@ -91,11 +91,11 @@ The rheostat reader offers excellent linearity however it suffers from full scal
 .. figure:: images/qadc_rheo_ticks.png
    :width: 80%
 
-   QADC Rehostat Timer Ticks vs Position
+   QADC Rheostat Timer Ticks vs Position
 
 
 Potential Reader
-----------------
+................
 
 The potential reader uses all three terminals of a potentiometer where the track end terminals are connected between ground and Vddio. Depending on the initial reading of the IO pin, the QADC either charges the capacitor to Vddio or discharges it ground and then times the transition through the threshold point to the potential set by the potentiometer, via the equivalent resistance of the potentiometer. The equivalent resistance of the potentiometer is the parallel of the upper and lower sections between the wiper and the end terminals.
 
@@ -125,7 +125,7 @@ The scheme works as follows:
 - Use the lookup table to calculate the start voltage.
 - Post process value to reduce noise and improve linearity.
 
-The potential reader offers good performance and is less susceptible to component tolerances due to the mathematics of using a parallel resistor network and the logarithm used. It will always achieve zero and full scale however if tolerances are too large then it may show worse non-linearity than the rheostat reader and, in particular, around the 35% setting point which corresponds the threshold voltage of the IO. It does however always remain monotonic in operation. The fact that a small amount of noise is present when taking readings close to the threshold point and a moving average filter is typically used, these non-linearities are reduced in practice and more than eight bits of resolution can easily be acheived.
+The potential reader offers good performance and is less susceptible to component tolerances due to the mathematics of using a parallel resistor network and the logarithm used. It will always achieve zero and full scale however if tolerances are too large then it may show worse non-linearity than the rheostat reader and, in particular, around the 35% setting point which corresponds the threshold voltage of the IO. It does however always remain monotonic in operation. The fact that a small amount of noise is present when taking readings close to the threshold point and a moving average filter is typically used, these non-linearities are reduced in practice and more than eight bits of resolution can easily be achieved.
 
 
 
@@ -199,7 +199,7 @@ If a manufacturing test is an option to calibrate the component values then this
 .. figure:: images/qadc_rheo_tol.png
    :width: 80%
 
-   QADC Rehostat Effect of 20% Tolerance on Transfer Curve
+   QADC Rheostat Effect of 20% Tolerance on Transfer Curve
 
 
 The `Potentiometer` approach is more tolerant to the overall end to end resistance since it's operation also relies on the starting potential as well as the equivalent series resistance at any given setting, which itself is a function of the end-end track resistance. Even when tolerance is 20% out the end positions will always achieve zero and full scale however linearity is slightly degraded and a small flat spot or inflection point may be seen at around 1/3 of the travel. 
@@ -211,7 +211,7 @@ Where the potentiometer end to end resistance is higher than set in the model, f
 The small steps in the transfer curve close to zero and full scale settings are caused by the QADC not being able to charge the capacitor past the threshold voltage due to the potential divider effect of the series resistor and the potentiometer equivalent series resistance.
 
 .. note::
-    Overall, it is recommended to use the `Potentiometer` approach in cases where the potentiometer tolerance is up to 20% and a manufacturing calibration step is not practical.
+    Overall, it is recommended to use the `Potentiometer` approach in cases where the potentiometer tolerance is between 10% and 20% and including a manufacturing calibration step is not practical.
 
 
 .. _fig_qadc_pot_tol:
@@ -243,9 +243,9 @@ Typical values recommended are:
      - Potentiometer value
      - Series resistor value
      - Conversion cycle time
-   * - 3300 pF 5%
-     - 10 kOhms 20% or better
-     - 470 Ohms 5% or better
+   * - 2000 pF 5%
+     - 47 kOhms, 20% or better
+     - 470 Ohms, 5% or better
      - 1 millisecond (= 100,000 10 MHz timer ticks)
 
 
@@ -281,6 +281,9 @@ When infrequent conversions are made using ``single shot`` mode it is recommende
 
 QADC API
 --------
+
+Common API
+..........
 
 Common items for both types of QADC are shown here.
 

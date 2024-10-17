@@ -2,7 +2,7 @@
 tests/*
 build/*
 **LICENSE*
-
+CHANGELOG.rst
 # Do not build .md files
 
 *.md
