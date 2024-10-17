@@ -222,16 +222,37 @@ Passive Component Selection
 
 There are three components to consider when building one channel of QADC.
 
-The variable resistor should be typically in the order of 20 - 50 kOhms. A lower value such as 10k Ohms may be used but it will either reduce the accuracy of the QADC slightly due to the increasing effect of the (required) series resistor and a reduced count or require the inclusion a larger capacitor to compensate which will increase power consumption due to greater charge/discharge amounts. Choosing a value significantly of 100 k Ohms or above may also decrease performance due to PCB parasitics or IO input leakage affecting the accuracy.
+The variable resistor should be typically in the order of 20 - 50 kOhms. A lower value such as 10k Ohms may be used but it will either reduce the accuracy of the QADC slightly due to the increasing effect of the (required) series resistor and a reduced count or require the inclusion a larger capacitor to compensate which will increase power consumption due to greater charge/discharge amounts. The practical effect of this will also to be to increase the step sizes seen at the end positions of the transfer curves.
 
-The capacitor value should by typically around 2 - 5 nF typically with the same tradeoffs being seen as that of the variable resistor.
+Choosing a value significantly of 100 k Ohms or above may also decrease performance due to PCB parasitics or IO input leakage affecting the accuracy.
+
+The capacitor value should by typically around 2 - 5 nF typically with the same tradeoffs being seen as that of the variable resistor. A larger value is acceptable but it will increase the conversion time.
 
 The series resistor value is a compromise. Ideally it would set to a low value to reduce the small step effects however this increases the current draw on the IO pin when the slider is close to end settings, which is undesirable. Typically a value of 1% of the variable resistor value is applicable with a minimum being around 330 ohms.
 
+Typical values recommened are:
+
+.. list-table:: Recommended values of QADC
+   :widths: 25 25 25 25
+   :header-rows: 1
+
+   * - Capacitor nF
+     - Potentiometer Ohms
+     - Series resistor Ohms
+     - Conversion cycle time
+   * - 3300 5%
+     - 10 k 10%
+     - 470 1%
+     - 
 
 
 QADC Potentiometer API
 ----------------------
+
+.. doxygenstruct:: adc_pot_config_t
+    :members:
+
+.. doxygenstruct:: adc_pot_state_t
 
 .. doxygengroup:: lib_qadc_pot_reader
    :content-only:

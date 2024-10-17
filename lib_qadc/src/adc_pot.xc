@@ -334,9 +334,9 @@ void do_adc_timing_init(port p_adc[], adc_pot_state_t &adc_pot_state, pot_timing
     pot_timings.max_discharge_period_ticks = (adc_pot_state.max_lut_ticks_up > adc_pot_state.max_lut_ticks_down ?
                                                 adc_pot_state.max_lut_ticks_up : adc_pot_state.max_lut_ticks_down);
 
-    dprintf("convert_interval_ticks: %d max charge/discharge_period: %lu\n", adc_pot_state.adc_config.convert_interval_ticks, port_timings.max_charge_period_ticks + port_timings.max_discharge_period_ticks);
+    dprintf("convert_interval_ticks: %d max charge/discharge_period: %lu\n", adc_pot_state.adc_config.convert_interval_ticks, pot_timings.max_charge_period_ticks + pot_timings.max_discharge_period_ticks);
     dprintf("max_charge_period_ticks: %lu max_dis_period_ticks (up/down): (%lu,%lu), crossover_idx: %u\n",
-            max_charge_period_ticks, adc_pot_state.max_lut_ticks_up, adc_pot_state.max_lut_ticks_down, adc_pot_state.crossover_idx);
+            pot_timings.max_charge_period_ticks, adc_pot_state.max_lut_ticks_up, adc_pot_state.max_lut_ticks_down, adc_pot_state.crossover_idx);
     assert(adc_pot_state.adc_config.convert_interval_ticks > pot_timings.max_charge_period_ticks + pot_timings.max_discharge_period_ticks * 2); // Ensure conversion rate is low enough. *2 to allow post processing time
 
 }
