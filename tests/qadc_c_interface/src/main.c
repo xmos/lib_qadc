@@ -59,9 +59,9 @@ void qadc_rheo_task_wrapper(chanend_t c_adc_rheo, port_t *p_adc,  qadc_config_t 
 }
 
 int main(void){
-    const qadc_config_t adc_config = {  5000,
+    const qadc_config_t adc_config = {  2000,
                                         47000,
-                                        330,
+                                        470,
                                         3.3,
                                         1.15,
                                         1 * XS1_TIMER_KHZ,
@@ -80,6 +80,6 @@ int main(void){
         PJOB(client, (c_adc_pot.end_b, c_adc_rheo.end_b))
     );
 
-    printstr("Fin\n");
+    printstr("Success!\n");
     return 0;
 }

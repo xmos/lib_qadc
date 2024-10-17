@@ -55,8 +55,8 @@ def pot_lut_compare(cap_pf, res_pot, res_ser, vrail, vthresh, num_adc, filter_de
     lut_model_up = np.array(qadc.up, dtype=np.uint16)
     lut_model_down = np.array(qadc.down, dtype=np.uint16)
 
-    assert lut_dut_up.shape == lut_model_up.shape, "ERROR: LUTs different shapes"
-    assert lut_dut_down.shape == lut_model_down.shape, "ERROR: LUTs different shapes"
+    assert lut_dut_up.shape == lut_model_up.shape, f"ERROR: LUTs different shapes {lut_dut_up.shape} {lut_model_up.shape}"
+    assert lut_dut_down.shape == lut_model_down.shape, f"ERROR: LUTs different shapes {lut_dut_down.shape} {lut_model_down.shape}"
 
     for i in range(lut_size):
         assert np.isclose(lut_dut_up[i], lut_model_up[i], rtol=0.001), f"ERROR: LUTs different at index {i}"
