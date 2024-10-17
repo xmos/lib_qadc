@@ -6,9 +6,13 @@
 #include <print.h>
 #include <xcore/hwtimer.h>
 
-
 #include "qadc.h"
-#include "filter_settings.h"
+
+#define NUM_ADC         2
+#define LUT_SIZE        64
+#define FILTER_DEPTH    4
+#define HYSTERESIS      1
+
 
 port_t p_adc_pot[] = {XS1_PORT_1A, XS1_PORT_1B};
 port_t p_adc_rheo[] = {XS1_PORT_1C, XS1_PORT_1D};
