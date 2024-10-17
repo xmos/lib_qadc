@@ -25,7 +25,7 @@ void control_task(chanend c_adc){
 
         printf("Read channel ");
         for(unsigned ch = 0; ch < NUM_ADC; ch++){
-            c_adc <: (uint32_t)ADC_CMD_READ | ch;
+            c_adc <: (uint32_t)QADC_CMD_READ | ch;
             c_adc :> adc[ch];
 
             printf("%u: %u (%u), ", ch, adc[ch], adc_dir[ch]);
