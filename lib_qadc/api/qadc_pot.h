@@ -68,7 +68,9 @@ typedef struct qadc_pot_state_t{
 /**
  * Initialise a QADC potentiometer reader instance and initialise the qadc_pot_state structure. 
  * This generates the look up table, initialises the state and sets up the ports used by the QADC.
- * Must be called before either qadc_pot_single() or adc_pot_task().
+ * Must be called before either qadc_pot_single() or qadc_pot_task().
+ * 
+ * USE THIS FUNCTION IF CALLING FROM XC AND USING par{} TO START THE THREADS.
  *
  * \param p_adc         An array of 1 bit ports used for conversion.
  * \param num_adc       The number of 1 bit ports (QADC channels) used.
@@ -89,6 +91,34 @@ void qadc_pot_init(  port p_adc[],
                     uint16_t *state_buffer,
                     qadc_config_t adc_config,
                     REFERENCE_PARAM(qadc_pot_state_t, adc_pot_state));
+
+/**
+ * Initialise a QADC potentiometer reader instance and initialise the qadc_pot_state structure. 
+ * This generates the look up table, initialises the state and sets up the ports used by the QADC.
+ * Must be called before either qadc_pot_single() or qadc_pot_task().
+ * 
+ * USE THIS FUNCTION IF CALLING FROM C WITH lib_xcore's PAR_JOBS() TO START THE THREADS.
+ *
+ * \param p_adc         An array of 1 bit ports used for conversion.
+ * \param num_adc       The number of 1 bit ports (QADC channels) used.
+ * \param lut_size      The size of the look up table. Also sets the output result full scale value to lut_size - 1.
+ * \param filter_depth  The size of the moving average filter used to average each conversion result.   
+ * \param state_buffer  pointer to the state buffer used of type uint16_t. Please use the ADC_POT_STATE_SIZE
+ *                      macro to size the declaration of the state buffer.
+ * \param adc_config    A struct of type qadc_config_t containing the parameters of the QADC external components
+ *                      and conversion rate / mode. This must be initialised before passing to qadc_pot_init().
+ * \param adc_pot_state Reference to the qadc_pot_state_t struct which contains internal state for the QADC. This
+ *                      does not need to be initialised before hand since this function does that.
+ */ 
+void qadc_pot_init_c(port p_adc[],
+                    size_t num_adc,
+                    size_t lut_size,
+                    size_t filter_depth,
+                    unsigned result_hysteresis,
+                    uint16_t *state_buffer,
+                    qadc_config_t adc_config,
+                    REFERENCE_PARAM(qadc_pot_state_t, adc_pot_state));
+
 
 /**
  * Perform a single ADC conversion on a specific channel. In this mode the QADC does not require a dedicated

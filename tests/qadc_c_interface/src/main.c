@@ -10,6 +10,7 @@
 
 #define NUM_ADC         2
 #define LUT_SIZE        64
+#define NUM_STEPS       64
 #define FILTER_DEPTH    4
 #define HYSTERESIS      1
 
@@ -26,37 +27,28 @@ void client(chanend_t c_adc_pot, chanend_t c_adc_rheo){
     printstr("Client 2\n");
 }
 
+DECLARE_JOB(qadc_rheo_task_wrapper, (chanend_t, port_t *, qadc_config_t));
+void qadc_rheo_task_wrapper(chanend_t c_adc_rheo, port_t *p_adc,  qadc_config_t adc_config){
+    qadc_rheo_state_t adc_rheo_state;
+    uint16_t state_buffer_rheo[QADC_RHEO_STATE_SIZE(NUM_ADC, FILTER_DEPTH)];
+
+    qadc_rheo_init_c(p_adc_rheo, NUM_ADC, NUM_STEPS, FILTER_DEPTH, HYSTERESIS, state_buffer_rheo, adc_config, &adc_rheo_state);
+    printstr("Init 1\n");
+
+    qadc_rheo_task(c_adc_rheo, p_adc, &adc_rheo_state);
+}
+
 DECLARE_JOB(qadc_pot_task_wrapper, (chanend_t, port_t *, qadc_config_t));
 void qadc_pot_task_wrapper(chanend_t c_adc_pot, port_t *p_adc, qadc_config_t adc_config){
-    hwtimer_realloc_xc_timer();
     qadc_pot_state_t adc_pot_state;
     uint16_t state_buffer_pot[QADC_POT_STATE_SIZE(NUM_ADC, LUT_SIZE, FILTER_DEPTH)];
 
-    for(int i = 0; i < NUM_ADC; i++){
-        port_enable(p_adc[i]);
-    }
-
-    qadc_pot_init(p_adc_pot, NUM_ADC, LUT_SIZE, FILTER_DEPTH, HYSTERESIS, state_buffer_pot, adc_config, &adc_pot_state);
+    qadc_pot_init_c(p_adc_pot, NUM_ADC, LUT_SIZE, FILTER_DEPTH, HYSTERESIS, state_buffer_pot, adc_config, &adc_pot_state);
     printstr("Init 2\n");
 
     qadc_pot_task(c_adc_pot, p_adc, &adc_pot_state);
 }
 
-DECLARE_JOB(qadc_rheo_task_wrapper, (chanend_t, port_t *, qadc_config_t));
-void qadc_rheo_task_wrapper(chanend_t c_adc_rheo, port_t *p_adc,  qadc_config_t adc_config){
-    hwtimer_realloc_xc_timer();
-    qadc_rheo_state_t adc_rheo_state;
-    uint16_t state_buffer_rheo[QADC_RHEO_STATE_SIZE(NUM_ADC, FILTER_DEPTH)];
-    
-    for(int i = 0; i < NUM_ADC; i++){
-        port_enable(p_adc[i]);
-    }
-
-    qadc_rheo_init(p_adc_rheo, NUM_ADC, 1024, FILTER_DEPTH, HYSTERESIS, state_buffer_rheo, adc_config, &adc_rheo_state);
-    printstr("Init 1\n");
-
-    qadc_rheo_task(c_adc_rheo, p_adc, &adc_rheo_state);
-}
 
 int main(void){
     const qadc_config_t adc_config = {  2000,
