@@ -94,7 +94,7 @@ int main() {
             const float v_thresh = 1.15;
             const char auto_scale = 1;
 
-            const unsigned convert_interval_ticks = (1 * XS1_TIMER_KHZ);
+            const unsigned convert_interval_ticks = (1 * XS1_TIMER_KHZ); // 1 millisecond
             
             const adc_pot_config_t adc_config = {capacitor_pf,
                                                 potentiometer_ohms,
@@ -110,7 +110,6 @@ int main() {
             // Only use moving average filter if in continuous mode
             unsigned used_filter_depth = (CONTINUOUS == 1) ? FILTER_DEPTH : 1;
             adc_pot_init(p_adc, NUM_ADC, LUT_SIZE, used_filter_depth, HYSTERESIS, state_buffer, adc_config, adc_pot_state);
-            
 
 #if (CONTINUOUS == 1)
 // The continuous mode allows for a shared memory interface if the QADC is on the same tile.

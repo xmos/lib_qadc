@@ -30,10 +30,10 @@ Features
 
  * Rheostat reader or Potentiometer reader
  * One channel per 1-bit port
- * Up to 5000 raw conversions per second
+ * Up to 3000 conversions per second
  * 8 to 9 effective number of bits (ENOB)
  * Filtering and hysteresis functions for smoothing the output noise
- * Continuous conversion (using a thread) or single shot API
+ * Continuous conversion (using a thread) or single shot API via function call
 
 **************
 Resource Usage
