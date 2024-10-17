@@ -28,19 +28,6 @@ typedef struct qadc_rheo_state_t{
 
 
 
-/** 
- * @brief   Channel communication commands for qadc_rheo_task(). Please OR this with
- *          the operand in cases where a channel index is needed.
- */
-#define ADC_CMD_READ                0x01000000ULL         
-#define ADC_CMD_CAL_MODE_START      0x02000000ULL
-#define ADC_CMD_CAL_MODE_FINISH     0x03000000ULL
-#define ADC_CMD_STOP_CONV           0x05000000ULL
-#define ADC_CMD_START_CONV          0x06000000ULL
-#define ADC_CMD_EXIT                0x07000000ULL
-#define ADC_CMD_MASK                0xff000000ULL
-
-
 
 /**
  * \addtogroup lib_qadc_rheo_reader

@@ -32,18 +32,6 @@ typedef struct qadc_pot_state_t{
     uint16_t * UNSAFE filter_write_idx;
 }qadc_pot_state_t;
 
-/** 
- * @brief   Channel communication commands for the adc task. Please OR this with
- *          the operand in cases where a channel index is needed.
- */
-#define ADC_CMD_READ                0x01000000ULL       /** Read an ADC channel, arg: channel number in LSB. */  
-#define ADC_CMD_CAL_MODE_START      0x02000000ULL       /** Start calibration mode. Move the potentiometer end to end to determine limits. */
-#define ADC_CMD_CAL_MODE_FINISH     0x03000000ULL       /** Stop calibration mode and use new observed limits. */
-#define ADC_CMD_POT_GET_DIR         0x04000000ULL       /** Read the conversion direction (1 = High to low, 0 = Low to high) of an ADC channel, arg: channel number in LSB. */
-#define ADC_CMD_POT_STOP_CONV       0x05000000ULL       /** Temporarily stop conversion. */
-#define ADC_CMD_POT_START_CONV      0x06000000ULL       /** Restart conversion. */
-#define ADC_CMD_POT_EXIT            0x07000000ULL       /** Exit the qadc_pot_task(). */
-#define ADC_CMD_MASK                0xff000000ULL       /** Mask word used for building commands */
 
 
 /**

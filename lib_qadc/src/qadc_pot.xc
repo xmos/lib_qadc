@@ -399,29 +399,29 @@ void qadc_pot_task(chanend ?c_adc, port p_adc[], qadc_pot_state_t &adc_pot_state
 
             // Handle comms. Only do in charging phase which is quite a long period and non critical if stretched
             case (adc_state == ADC_CHARGING || adc_state == ADC_STOPPED) && !isnull(c_adc) => c_adc :> uint32_t command:
-                switch(command & ADC_CMD_MASK){
-                    case ADC_CMD_READ:
-                        uint32_t ch = command & (~ADC_CMD_MASK);
+                switch(command & QADC_CMD_MASK){
+                    case QADC_CMD_READ:
+                        uint32_t ch = command & (~QADC_CMD_MASK);
                         unsafe{c_adc <: (uint32_t)adc_pot_state.results[ch];}
                     break;
-                    case ADC_CMD_POT_GET_DIR:
-                        uint32_t ch = command & (~ADC_CMD_MASK);
+                    case QADC_CMD_POT_GET_DIR:
+                        uint32_t ch = command & (~QADC_CMD_MASK);
                         c_adc <: (uint32_t)adc_pot_state.init_port_val[ch];
                     break;
-                    case ADC_CMD_POT_STOP_CONV:
+                    case QADC_CMD_STOP_CONV:
                         for(int i = 0; i < adc_pot_state.num_adc; i++){
-                            p_adc[adc_idx] :> int _;
+                            p_adc[i] :> int _;
                         }
                         adc_state = ADC_STOPPED;
                     break;
-                    case ADC_CMD_POT_START_CONV:
+                    case QADC_CMD_START_CONV:
                         tmr_charge :> pot_timings.time_trigger_charge;
                         pot_timings.time_trigger_charge += pot_timings.max_charge_period_ticks; // start in one charge period
                         // Clear all history apart from scaling
                         memset(adc_pot_state.results, 0, adc_pot_state.max_seen_ticks_up - adc_pot_state.results);
                         adc_state = ADC_IDLE;
                     break;
-                    case ADC_CMD_POT_EXIT:
+                    case QADC_CMD_EXIT:
                         return;
                     break;
                     default:

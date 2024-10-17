@@ -16,6 +16,7 @@
 #define debprintf(...) printf(...) 
 
 typedef enum adc_state_t{
+        ADC_STOPPED = 3,
         ADC_IDLE = 2,
         ADC_CHARGING = 1,
         ADC_CONVERTING = 0 // Optimisation as ISA can do != 0 on select guard
@@ -296,7 +297,7 @@ void qadc_rheo_task(chanend c_adc, port p_adc[], qadc_rheo_state_t &adc_rheo_sta
                 adc_state = ADC_IDLE;
             break;
 
-            case adc_state == ADC_CONVERTING => tmr_overshoot when timerafter(time_trigger_overshoot) :> int _:
+            case (adc_state == ADC_CONVERTING || adc_state == ADC_STOPPED)=> tmr_overshoot when timerafter(time_trigger_overshoot) :> int _:
                 p_adc[adc_idx] :> int _ @ end_time;
                 unsafe{adc_rheo_state.results[adc_idx] = adc_rheo_state.adc_steps - 1;}
                 printf("ticks: %u overshoot \n", end_time - start_time);
@@ -309,11 +310,27 @@ void qadc_rheo_task(chanend c_adc, port p_adc[], qadc_rheo_state_t &adc_rheo_sta
             break;
 
             case c_adc :> uint32_t command:
-                switch(command & ADC_CMD_MASK){
-                    case ADC_CMD_READ:
-                        uint32_t ch = command & (~ADC_CMD_MASK);
+                switch(command & QADC_CMD_MASK){
+                    case QADC_CMD_READ:
+                        uint32_t ch = command & (~QADC_CMD_MASK);
                         printf("read ch: %lu \n", ch);
                         unsafe{c_adc <: (uint32_t)adc_rheo_state.results[ch];}
+                    break;
+                    case QADC_CMD_STOP_CONV:
+                        for(int i = 0; i < adc_rheo_state.num_adc; i++){
+                            p_adc[i] :> int _;
+                        }
+                        adc_state = ADC_STOPPED;
+                    break;
+                    case QADC_CMD_START_CONV:
+                        tmr_charge :> time_trigger_charge;
+                        time_trigger_charge += max_charge_period_ticks; // start in one conversion period's
+                        // Clear all history apart from scaling
+                        memset(adc_rheo_state.results, 0, adc_rheo_state.hysteris_tracker - adc_rheo_state.results);
+                        adc_state = ADC_IDLE;
+                    break;
+                    case QADC_CMD_EXIT:
+                        return;
                     break;
                     default:
                         assert(0);

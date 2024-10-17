@@ -16,8 +16,8 @@ port_t p_adc_rheo[] = {XS1_PORT_1C, XS1_PORT_1D};
 DECLARE_JOB(client, (chanend_t, chanend_t));
 void client(chanend_t c_adc_pot, chanend_t c_adc_rheo){
     printstr("Client 0\n");
-    chan_out_word(c_adc_pot, (uint32_t)ADC_CMD_POT_EXIT);
-    chan_out_word(c_adc_rheo, (uint32_t)ADC_CMD_POT_EXIT);
+    chan_out_word(c_adc_pot, (uint32_t)QADC_CMD_EXIT);
+    chan_out_word(c_adc_rheo, (uint32_t)QADC_CMD_EXIT);
     printstr("Client 1\n");
 }
 

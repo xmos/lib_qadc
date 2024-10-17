@@ -113,10 +113,10 @@ void control_task(chanend c_adc, client interface i2c_master_if i2c){
         delay_ticks(convert_interval_ticks * FILTER_DEPTH * 2);
 
         int ch = 0;
-        c_adc <: (uint32_t)ADC_CMD_READ | ch;
+        c_adc <: (uint32_t)QADC_CMD_READ | ch;
         c_adc :> adc[ch];
 
-        c_adc <: (uint32_t)ADC_CMD_POT_STOP_CONV;
+        c_adc <: (uint32_t)QADC_CMD_STOP_CONV;
         delay_milliseconds(5); // Time to read the actual pot voltage
         r = i2c.read(addr, i2c_data, 2, 1);
         if(r != I2C_ACK){
@@ -124,7 +124,7 @@ void control_task(chanend c_adc, client interface i2c_master_if i2c){
         }
         uint16_t ref_val = (((i2c_data[0] & 0xf) << 8) | i2c_data[1]) >> 2;
         printf("ref_val: %u conv_val: %u \n", ref_val, adc[ch]);
-        c_adc <: (uint32_t)ADC_CMD_POT_START_CONV;
+        c_adc <: (uint32_t)QADC_CMD_STOP_CONV;
 
         cal_table[ref_val] = adc[ch];
         delay_milliseconds(1);
@@ -150,7 +150,7 @@ void control_task(chanend c_adc, client interface i2c_master_if i2c){
 
     // Close peripherals
     i2c.shutdown();
-    c_adc <: (uint32_t) ADC_CMD_POT_EXIT;
+    c_adc <: (uint32_t) QADC_CMD_EXIT;
 }
 
 int main() {

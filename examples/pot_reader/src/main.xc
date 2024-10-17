@@ -33,9 +33,9 @@ void control_task(chanend ?c_adc, uint16_t * unsafe result_ptr){
                 printf("ch %u: %u, ", ch, adc[ch]);
 
             } else {
-                c_adc <: (uint32_t)ADC_CMD_READ | ch;
+                c_adc <: (uint32_t)QADC_CMD_READ | ch;
                 c_adc :> adc[ch];
-                c_adc <: (uint32_t)ADC_CMD_POT_GET_DIR | ch; // Get the direction of conversion (from which rail it started)
+                c_adc <: (uint32_t)QADC_CMD_POT_GET_DIR | ch; // Get the direction of conversion (from which rail it started)
                 c_adc :> adc_dir[ch];
 
                 printf("ch %u: %u (%u), ", ch, adc[ch], adc_dir[ch]);
@@ -49,9 +49,9 @@ void control_task(chanend ?c_adc, uint16_t * unsafe result_ptr){
         if(!isnull(c_adc)){
             if(++counter == 10){
                 printf("Restarting ADC...\n");
-                c_adc <: (uint32_t)ADC_CMD_POT_STOP_CONV;
+                c_adc <: (uint32_t)QADC_CMD_STOP_CONV;
                 delay_milliseconds(1000); // Time to read the actual pot voltage
-                c_adc <: (uint32_t)ADC_CMD_POT_START_CONV;
+                c_adc <: (uint32_t)QADC_CMD_STOP_CONV;
                 counter = 0;
                 delay_milliseconds(100);
             }

@@ -59,7 +59,7 @@ int main(unsigned argc, char * unsafe argv[argc]){
     {
         qadc_pot_task(c_adc, p_adc, adc_pot_state);
         {
-            c_adc <: (uint32_t)ADC_CMD_POT_EXIT;
+            c_adc <: (uint32_t)QADC_CMD_EXIT;
         }
     }
 
