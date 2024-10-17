@@ -58,6 +58,9 @@ def pot_lut_compare(cap_pf, res_pot, res_ser, vrail, vthresh, num_adc, filter_de
     assert lut_dut_up.shape == lut_model_up.shape, f"ERROR: LUTs different shapes {lut_dut_up.shape} {lut_model_up.shape}"
     assert lut_dut_down.shape == lut_model_down.shape, f"ERROR: LUTs different shapes {lut_dut_down.shape} {lut_model_down.shape}"
 
+    print(lut_dut_up.shape)
+    print(lut_dut_down.shape)
+
     for i in range(lut_size):
         assert np.isclose(lut_dut_up[i], lut_model_up[i], rtol=0.001), f"ERROR: LUTs different at index {i}"
         assert np.isclose(lut_dut_down[i], lut_model_down[i], rtol=0.001), f"ERROR: LUTs different at index {i}"
@@ -67,7 +70,7 @@ def pot_lut_compare(cap_pf, res_pot, res_ser, vrail, vthresh, num_adc, filter_de
 
 
 def test_pot_lut():
-    pot_lut_compare(3000, 47000, 470, 3.3, 1.14, 1, 32, 1024, 1)
+    pot_lut_compare(3000, 47000, 470, 3.3, 1.14, 1, 32, 1022, 1)
 
 if __name__ == "__main__":
     test_pot_lut()

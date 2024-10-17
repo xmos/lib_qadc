@@ -287,6 +287,12 @@ Common API
 
 Common items for both types of QADC are shown here.
 
+.. note::
+    Depending on whether QADC is called from an XC program with a par{} or from C with PAR_JOBS()
+    extra hardware setup is needed. If using PAR_JOBS() please call qadc_pre_init_c() before 
+    QADC initialisation.
+
+
 .. doxygenstruct:: qadc_config_t
     :members:
 
@@ -299,9 +305,6 @@ QADC Rheostat API
 
 Specific items for the Rheostat QADC are shown here.
 
-.. note::
-    There are two versions of the initialisation function. Depending on whether QADC is called from an XC program with a par{} or from C with PAR_JOBS()
-    a different hardware setup is needed. Please use the correct init function. All other aspects of the API are identical.
 
 .. doxygenstruct:: qadc_rheo_state_t
 
@@ -312,10 +315,6 @@ QADC Potentiometer API
 ......................
 
 Specific items for the Potentiometer QADC are shown here.
-
-.. note::
-    There are two versions of the initialisation function. Depending on whether QADC is called from an XC program with a par{} or from C with PAR_JOBS()
-    a different hardware setup is needed. Please use the correct init function. All other aspects of the API are identical.
 
 .. doxygenstruct:: qadc_pot_state_t
 

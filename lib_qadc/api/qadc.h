@@ -72,6 +72,18 @@ typedef uint16_t         qadc_q3_13_fixed_t;
  */
 #define QADC_Q_3_13_SHIFT    13
 
+/**
+ * Perform xcore resource setup if QADC is to be used from C with lib_xcore PAR_JOBS().
+ * Because QADC is written in XC it expects ports to be enabled and an XC timer to
+ * be available. This pre-init function meets those needs if using from a lib_core 
+ * based project
+ *
+ * \param p_adc          An array of 1 bit ports used for conversion.
+ * \param num_adc        The number of QADC channels (ports) used
+ */ 
+void qadc_pre_init_c(port p_adc[], size_t num_adc);
+
+
 /**@}*/ // END: addtogroup lib_qadc_common
 
 
