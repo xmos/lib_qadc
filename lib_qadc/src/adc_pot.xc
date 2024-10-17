@@ -30,7 +30,7 @@ void adc_pot_init(  port p_adc[],
                     adc_pot_config_t adc_config,
                     adc_pot_state_t &adc_pot_state) {
     unsafe{
-        memset(state_buffer, 0, ADC_POT_STATE_SIZE(num_adc, lut_size, filter_depth));
+        memset(state_buffer, 0, ADC_POT_STATE_SIZE(num_adc, lut_size, filter_depth) * sizeof(uint16_t));
 
         adc_pot_state.num_adc = num_adc;
         adc_pot_state.lut_size = lut_size;
