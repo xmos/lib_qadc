@@ -6,9 +6,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-
 #include "qadc.h"
-#include "filter_settings.h"
+
+#define NUM_ADC         1
+#define LUT_SIZE        1024
+#define FILTER_DEPTH    32
+#define HYSTERESIS      1
 
 
 on tile[0]: port p_adc[] = {XS1_PORT_1A, XS1_PORT_1D}; // Sets which pins are to be used (channels 0..n)  // X0D00, 11;
