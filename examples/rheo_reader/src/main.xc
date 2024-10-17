@@ -19,16 +19,13 @@ void control_task(chanend c_adc){
 
     while(1){
         uint32_t adc[NUM_ADC];
-        uint32_t adc_dir[NUM_ADC];
-
-        // while(1);
 
         printf("Read channel ");
         for(unsigned ch = 0; ch < NUM_ADC; ch++){
             c_adc <: (uint32_t)QADC_CMD_READ | ch;
             c_adc :> adc[ch];
 
-            printf("%u: %u (%u), ", ch, adc[ch], adc_dir[ch]);
+            printf("%u: %u, ", ch, adc[ch]);
         }
         putchar('\n');
         delay_milliseconds(100);
