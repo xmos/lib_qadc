@@ -276,7 +276,7 @@ static void do_adc_start_convert(port p_adc[], unsigned adc_idx, qadc_pot_state_
     pot_timings.time_trigger_overshoot = pot_timings.time_trigger_start_convert + (pot_timings.max_ticks_expected * 2);
 }
 
-static void do_adc_convert(port p_adc[], unsigned adc_idx, qadc_pot_state_t &adc_pot_state, pot_timings_t &pot_timings){
+static void do_adc_convert(unsigned adc_idx, qadc_pot_state_t &adc_pot_state, pot_timings_t &pot_timings){
     unsafe{
         int32_t conversion_time = (pot_timings.end_time - pot_timings.start_time);
         if(conversion_time < 0){
@@ -338,17 +338,14 @@ static void do_adc_convert(port p_adc[], unsigned adc_idx, qadc_pot_state_t &adc
 }
 
 
-static void do_adc_handle_overshoot(port p_adc[], unsigned adc_idx, qadc_pot_state_t &adc_pot_state, pot_timings_t &pot_timings){
-    unsigned overshoot_port_val = 0;
-    p_adc[adc_idx] :> overshoot_port_val; // For debug only.
-
+static void do_adc_handle_overshoot(unsigned adc_idx, qadc_pot_state_t &adc_pot_state, pot_timings_t &pot_timings){
     unsafe{
         unsigned is_up = adc_pot_state.init_port_val[adc_idx];
         uint16_t result = adc_pot_state.crossover_idx + (is_up != 0 ? 1 : 0);
         uint16_t post_proc_result = post_process_result(result, adc_idx, adc_pot_state);
         adc_pot_state.results[adc_idx] = post_proc_result;
 
-        dprintf("result: %u ch: %u overshoot (ticks>%d) val:%u\n", post_proc_result, adc_idx, pot_timings.time_trigger_overshoot-pot_timings.time_trigger_start_convert, overshoot_port_val);
+        dprintf("result: %u ch: %u overshoot (ticks>%d)\n", post_proc_result, adc_idx, pot_timings.time_trigger_overshoot-pot_timings.time_trigger_start_convert);
     }
 
     pot_timings.time_trigger_charge += adc_pot_state.adc_config.convert_interval_ticks;
@@ -386,6 +383,7 @@ void qadc_pot_task(chanend ?c_adc, port p_adc[], qadc_pot_state_t &adc_pot_state
     pot_timings.time_trigger_charge += pot_timings.max_charge_period_ticks; // start in one charge period
     
     while(1) unsafe{
+        unsigned port_idx = adc_idx / adc_pot_state.port_width;
         select{
             case adc_state == ADC_IDLE => tmr_charge when timerafter(pot_timings.time_trigger_charge) :> int _:
                 do_adc_charge(p_adc, adc_idx, adc_pot_state, pot_timings);
@@ -397,27 +395,29 @@ void qadc_pot_task(chanend ?c_adc, port p_adc[], qadc_pot_state_t &adc_pot_state
                 adc_state = ADC_CONVERTING;
             break;
 
-            case adc_state == ADC_CONVERTING => p_adc[adc_idx] when pinseq(adc_pot_state.init_port_val[adc_idx]) :> int port_val @ pot_timings.end_time:
+            case adc_state == ADC_CONVERTING => p_adc[port_idx] when pinseq(adc_pot_state.init_port_val[adc_idx]) :> int port_val @ pot_timings.end_time:
                 if(adc_pot_state.port_width == 1){
-                    do_adc_convert(p_adc, adc_idx, adc_pot_state, pot_timings);
-
+                    do_adc_convert(adc_idx, adc_pot_state, pot_timings);
                 } else {
                     unsigned bit_idx = adc_idx % adc_pot_state.port_width;
-                    unsigned port_idx = adc_idx / adc_pot_state.port_width;
-
-                    break;
+                    unsigned bit_val = (port_val >> bit_idx) & 0x01;
+                    if(bit_val == adc_pot_state.init_port_val[adc_idx]){
+                        break; // Keep firing select until bit transiton found
+                    } else {
+                        do_adc_convert(adc_idx, adc_pot_state, pot_timings);
+                    }
                 }
+                
                 // Cycle through the ADC channels
                 if(++adc_idx == adc_pot_state.num_adc){
                     adc_idx = 0;
                 }
                 adc_state = ADC_IDLE;
-
             break;
 
             // This case happens if the hardware RC constant is much higher than expected
             case adc_state == ADC_CONVERTING => tmr_overshoot when timerafter(pot_timings.time_trigger_overshoot) :> int _:
-                do_adc_handle_overshoot(p_adc, adc_idx, adc_pot_state, pot_timings);
+                do_adc_handle_overshoot(adc_idx, adc_pot_state, pot_timings);
                 
                 // Cycle through the ADC channels
                 if(++adc_idx == adc_pot_state.num_adc){
@@ -479,10 +479,10 @@ uint16_t qadc_pot_single(port p_adc[], unsigned adc_idx, qadc_pot_state_t &adc_p
     unsafe{
         select{
             case p_adc[adc_idx] when pinseq(adc_pot_state.init_port_val[adc_idx]) :> int _ @ pot_timings.end_time:
-                do_adc_convert(p_adc, adc_idx, adc_pot_state, pot_timings);
+                do_adc_convert(adc_idx, adc_pot_state, pot_timings);
             break;
             case tmr_single when timerafter(pot_timings.time_trigger_overshoot) :> int _:
-                do_adc_handle_overshoot(p_adc, adc_idx, adc_pot_state, pot_timings);
+                do_adc_handle_overshoot(adc_idx, adc_pot_state, pot_timings);
             break;
         }
         result = adc_pot_state.results[adc_idx];
