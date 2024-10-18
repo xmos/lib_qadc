@@ -36,14 +36,14 @@ Two schemes are offered which have different pros and cons depending on the appl
        - 5%
        - 5%
      * - Typical minimum conversion time per channel
-       - ~0.5 - 1 milliseconds
-       - ~0.5 - 1 milliseconds
+       - ~0.2 - 0.5 milliseconds
+       - ~0.2 - 0.5 milliseconds
      * - Number of channels
        - Limited by 1 bit port count only
        - Limited by 1 bit port count only
      * - Typical ENOBs post filtering 
-       - 8 / 9
-       - 8 / 9
+       - 8+
+       - 8+
      * - Requires 5 % capacitor (eg C0G)
        - Yes
        - Yes
@@ -56,9 +56,9 @@ Two schemes are offered which have different pros and cons depending on the appl
      * - Monotonicity
        - Yes
        - Yes
-     * - Resource usage
-       - XXX kB
-       - XXX kB
+     * - Memory usage (8 bit, two channels)
+       - 3 kB
+       - 5 kB
 
 Noise is always a concern in the analog domain and the QADC is no different. In particular power supply stability and coupled signals (such as running the QADC input close to a digital IO) should be considered when designing the circuitry. Since the QADC relies on continuously charging and discharging a capacitor it is also recommended that any analog supplies on the board are separated from the xcore digital supply to avoid any noise from the QADC conversion process being coupled to places where it would unwelcome.
 
@@ -289,7 +289,7 @@ Common items for both types of QADC are shown here.
 
 .. note::
     Depending on whether QADC is called from an XC program with a par{} or from C with PAR_JOBS()
-    extra hardware setup is needed. If using PAR_JOBS() please call qadc_pre_init_c() before 
+    extra hardware setup may be needed. If using PAR_JOBS() please call qadc_pre_init_c() before 
     QADC initialisation.
 
 
