@@ -10,6 +10,7 @@
  */
 typedef struct qadc_pot_state_t{
     size_t num_adc;
+    unsigned port_width;
     unsigned adc_idx;
     size_t lut_size;
     size_t filter_depth;
