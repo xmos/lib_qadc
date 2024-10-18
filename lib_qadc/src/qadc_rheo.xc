@@ -318,7 +318,7 @@ void qadc_rheo_task(chanend ?c_adc, port p_adc[], qadc_rheo_state_t &adc_rheo_st
                 adc_state = ADC_IDLE;
             break;
 
-            case (adc_state == ADC_CHARGING || adc_state == ADC_STOPPED) => c_adc :> uint32_t command:
+            case ((adc_state == ADC_CHARGING || adc_state == ADC_STOPPED) && !isnull(c_adc)) => c_adc :> uint32_t command:
                 switch(command & QADC_CMD_MASK){
                     case QADC_CMD_READ:
                         uint32_t ch = command & (~QADC_CMD_MASK);

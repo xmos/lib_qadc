@@ -398,7 +398,7 @@ void qadc_pot_task(chanend ?c_adc, port p_adc[], qadc_pot_state_t &adc_pot_state
             break;
 
             // Handle comms. Only do in charging phase which is quite a long period and non critical if stretched
-            case (adc_state == ADC_CHARGING || adc_state == ADC_STOPPED) && !isnull(c_adc) => c_adc :> uint32_t command:
+            case ((adc_state == ADC_CHARGING || adc_state == ADC_STOPPED) && !isnull(c_adc)) => c_adc :> uint32_t command:
                 switch(command & QADC_CMD_MASK){
                     case QADC_CMD_READ:
                         uint32_t ch = command & (~QADC_CMD_MASK);
