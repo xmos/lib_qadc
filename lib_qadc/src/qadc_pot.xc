@@ -66,9 +66,9 @@ void qadc_pot_init( port p_adc[],
         ptr += num_adc;
         adc_pot_state.max_scale_down = ptr;
         ptr += num_adc;
-        adc_pot_state.cal_up = ptr;
+        adc_pot_state.lut_up = ptr;
         ptr += lut_size;
-        adc_pot_state.cal_down = ptr;
+        adc_pot_state.lut_down = ptr;
         ptr += lut_size;
         adc_pot_state.filter_write_idx = ptr;
         ptr += num_adc;
@@ -84,7 +84,7 @@ void qadc_pot_init( port p_adc[],
         }
 
         // Generate calibration lookup table
-        gen_lookup_pot( adc_pot_state.cal_up, adc_pot_state.cal_down, adc_pot_state.lut_size,
+        gen_lookup_pot( adc_pot_state.lut_up, adc_pot_state.lut_down, adc_pot_state.lut_size,
                         (float)adc_config.potentiometer_ohms, (float)adc_config.capacitor_pf * 1e-12, (float)adc_config.resistor_series_ohms,
                         adc_config.v_rail, adc_config.v_thresh,
                         &adc_pot_state.max_lut_ticks_up, &adc_pot_state.max_lut_ticks_down);
@@ -106,8 +106,8 @@ static inline unsigned ticks_to_position(int is_up, uint16_t ticks, unsigned adc
     unsafe{
 
         // Extract vars for readibility
-        uint16_t * unsafe up = adc_pot_state.cal_up;
-        uint16_t * unsafe down = adc_pot_state.cal_down;
+        uint16_t * unsafe up = adc_pot_state.lut_up;
+        uint16_t * unsafe down = adc_pot_state.lut_down;
         unsigned num_points = adc_pot_state.lut_size;
         unsigned port_time_offset = adc_pot_state.port_time_offset;
         qadc_q3_13_fixed_t max_scale_up = adc_pot_state.max_scale_up[adc_idx];

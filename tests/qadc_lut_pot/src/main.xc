@@ -7,7 +7,6 @@
 #include <stdlib.h>
 
 #include "qadc.h"
-
 #include "filter_settings.h"
 
 
@@ -63,9 +62,12 @@ int main(unsigned argc, char * unsafe argv[argc]){
         }
     }
 
-    FILE * movable fptr = fopen("pot_lut.bin","wb");
-    fwrite(state_buffer, sizeof(state_buffer), 1, fptr);
-    fclose(move(fptr));
+    unsafe{
+        FILE * movable fptr = fopen("pot_lut.bin","wb");
+        uint16_t * unsafe start_luts = adc_pot_state.lut_up;
+        fwrite(start_luts, sizeof(uint16_t) * LUT_SIZE, 2, fptr);
+        fclose(move(fptr));
+    }
 
     return 0;
 }
