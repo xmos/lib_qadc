@@ -12,7 +12,8 @@
 #define FILTER_DEPTH        16
 #define HYSTERESIS          1
 
-on tile[1]: port p_adc[] = {XS1_PORT_1M, XS1_PORT_1O}; // Sets which pins are to be used (channels 0..n) X1D36/38
+// on tile[1]: port p_adc[] = {XS1_PORT_1M, XS1_PORT_1O}; // Sets which pins are to be used (channels 0..n) X1D36/38
+on tile[1]: port p_adc[] = {XS1_PORT_4A}; // Sets which pins are to be used (channels 0..n) X1D02/03
 
 
 void control_task(chanend ?c_adc, uint16_t * unsafe result_ptr){
