@@ -419,7 +419,7 @@ void qadc_pot_task(chanend ?c_adc, port p_adc[], qadc_pot_state_t &adc_pot_state
                     // Work out if the pin of interest has changed
                     unsigned bit_idx = adc_idx % adc_pot_state.port_width;
                     unsigned bit_val = (port_val >> bit_idx) & 0x01;
-                    if(bit_val != adc_pot_state.init_port_val[port_idx]){
+                    if(bit_val != adc_pot_state.init_port_val[adc_idx]){
                         post_charge_port_val = port_val;
                         break; // Keep firing select until desired bit transiton found
                     } else {
@@ -492,8 +492,8 @@ uint16_t qadc_pot_single(port p_adc[], unsigned adc_idx, qadc_pot_state_t &adc_p
     do_adc_timing_init(adc_pot_state, pot_timings);
     tmr_single :> pot_timings.time_trigger_charge; // Set origin time. This is the datum for the following events.
     do_adc_charge(p_adc, adc_idx, adc_pot_state, pot_timings); // Start charging
-
     tmr_single when timerafter(pot_timings.time_trigger_start_convert) :> int _; // Wait until fully charged
+    
     unsigned post_charge_port_val = 0;
     p_adc[port_idx] :> post_charge_port_val; // Grab charged port val for wide version
     if(adc_pot_state.port_width == 1){
@@ -501,32 +501,38 @@ uint16_t qadc_pot_single(port p_adc[], unsigned adc_idx, qadc_pot_state_t &adc_p
     } else {
         post_charge_port_val = ~post_charge_port_val; // Trigger immediately so we catch the end cases
     }
+
     do_adc_start_convert(p_adc, adc_idx, adc_pot_state, pot_timings);
 
 
     // Now wait for conversion or overshoot timeout event
+    int conversion_ongoing = 1; // With mutli-bit we need to keep slecting until the known pin transition
     unsafe{
-        select{
-            case p_adc[port_idx] when pinsneq(post_charge_port_val) :> int port_val @ pot_timings.end_time:
-                if(adc_pot_state.port_width == 1){
-                    do_adc_convert(adc_idx, adc_pot_state, pot_timings);
-                } else {
-                    // Work out if the pin of interest has changed
-                    unsigned bit_idx = adc_idx % adc_pot_state.port_width;
-                    unsigned bit_val = (port_val >> bit_idx) & 0x01;
-                    if(bit_val != adc_pot_state.init_port_val[port_idx]){
-                        post_charge_port_val = port_val;
-                        break; // Keep firing select until desired bit transiton found
-                    } else {
+        while(conversion_ongoing){
+            select{
+                case p_adc[port_idx] when pinsneq(post_charge_port_val) :> int port_val @ pot_timings.end_time:
+                    if(adc_pot_state.port_width == 1){
                         do_adc_convert(adc_idx, adc_pot_state, pot_timings);
+                        conversion_ongoing = 0;
+                    } else {
+                        // Work out if the pin of interest has changed
+                        unsigned bit_idx = adc_idx % adc_pot_state.port_width;
+                        unsigned bit_val = (port_val >> bit_idx) & 0x01;
+                        if(bit_val != adc_pot_state.init_port_val[adc_idx]){
+                            post_charge_port_val = port_val;
+                            break; // Keep firing select until desired bit transiton found
+                        } else {
+                            do_adc_convert(adc_idx, adc_pot_state, pot_timings);
+                            conversion_ongoing = 0;
+                        }
                     }
-                }
-            break;
+                break;
 
-            case tmr_single when timerafter(pot_timings.time_trigger_overshoot) :> int _:
-                do_adc_handle_overshoot(adc_idx, adc_pot_state, pot_timings);
-                printchar('o');
-            break;
+                case tmr_single when timerafter(pot_timings.time_trigger_overshoot) :> int _:
+                    do_adc_handle_overshoot(adc_idx, adc_pot_state, pot_timings);
+                    conversion_ongoing = 0;
+                break;
+            }
         }
         result = adc_pot_state.results[adc_idx];
     }
