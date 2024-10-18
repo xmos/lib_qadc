@@ -17,6 +17,9 @@ import qadc_model
 def pot_lut_compare(cap_pf, res_pot, res_ser, vrail, vthresh, num_adc, filter_depth, lut_size, hysteresis):
     firmware_xe = root_dir/"tests"/"qadc_lut_pot"/"bin"/"qadc_pot_lut.xe"
     lut_file = file_dir/"pot_lut.bin"
+    if os.path.exists(lut_file):
+        os.remove(lut_file)
+
 
     print(f"Firmware: {firmware_xe}")
 
@@ -36,9 +39,7 @@ def pot_lut_compare(cap_pf, res_pot, res_ser, vrail, vthresh, num_adc, filter_de
 
     # Run test app
     cmd = f"xsim --args {firmware_xe} {cap_pf} {res_pot} {res_ser} {vrail} {vthresh}"
-    # if True:
-    if not os.path.isfile(lut_file):
-        subprocess.run(cmd.split())
+    subprocess.run(cmd.split())
 
     # Load output
     lut_dut = np.fromfile(lut_file, dtype=np.uint16)

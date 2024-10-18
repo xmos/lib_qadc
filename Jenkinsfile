@@ -108,11 +108,7 @@ pipeline {
                   withTools(params.TOOLS_VERSION) {
                     sh "cmake -G 'Unix Makefiles' -B build"
                     sh "xmake -C build -j 8"
-                    // sh 'python -m pytest --junitxml=pytest_result.xml'
-                    // Find out why pytest fails..
-                    sh 'python test_qadc_model_tolerance.py'
-                    sh 'xsim qadc_c_interface/bin/qadc_c_test.xe'
-                    sh 'python test_qadc_pot_lut.py'
+                    runPytest("-vv")
                   } // withTools
                 } // withVenv
               } // withEnv

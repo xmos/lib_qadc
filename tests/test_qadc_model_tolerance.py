@@ -69,11 +69,12 @@ def qadc_pot_test(tolerance_pc):
     qadc_pot_is_over = qadc_pot(cap_pf, r_pot_nom * (1+(tolerance_pc/100)), r_series, v_rail, v_thresh)
     sim_sweep(qadc, (qadc_pot_is_under, qadc_pot_is_over), tolerance_pc)
 
-
-
-def test_tolernace():
+def test_tolernace_pot():
     qadc_pot_test(20)
+
+def test_tolernace_rheo():
     qadc_rheo_test(20)
 
 if __name__ == "__main__":
-    test_tolernace()
+    test_tolernace_pot()
+    test_tolernace_rheo()
