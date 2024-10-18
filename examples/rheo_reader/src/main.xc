@@ -14,31 +14,71 @@
 
 on tile[1]: port p_adc[] = {XS1_PORT_1M, XS1_PORT_1O}; // Sets which pins are to be used (channels 0..n) X1D36/38
 
+void control_task(chanend ?c_adc, uint16_t * unsafe result_ptr){
+    printf("Running QADC in continuous mode using dedicated task!\n");
 
-void control_task(chanend c_adc){
+    unsigned counter = 0;
 
     while(1){
         uint32_t adc[NUM_ADC];
 
         printf("Read channel ");
         for(unsigned ch = 0; ch < NUM_ADC; ch++){
-            c_adc <: (uint32_t)QADC_CMD_READ | ch;
-            c_adc :> adc[ch];
+            if(isnull(c_adc)) unsafe{
+                adc[ch] = result_ptr[ch];
+                printf("ch %u: %u, ", ch, adc[ch]);
 
-            printf("%u: %u, ", ch, adc[ch]);
+            } else {
+                c_adc <: (uint32_t)QADC_CMD_READ | ch;
+                c_adc :> adc[ch];
+
+                printf("ch %u: %u, ", ch, adc[ch]);
+            }
+
+        }
+        putchar('\n');
+        delay_milliseconds(100);
+
+        // If using channel comms pause so we can read pot voltage for testing
+        if(!isnull(c_adc)){
+            if(++counter == 10){
+                printf("Restarting ADC...\n");
+                c_adc <: (uint32_t)QADC_CMD_STOP_CONV;
+                delay_milliseconds(1000); // Time to read the actual pot voltage
+                c_adc <: (uint32_t)QADC_CMD_START_CONV;
+                counter = 0;
+                delay_milliseconds(100);
+            }
+        }
+    }
+}
+
+void qadc_rheo_single_example(port p_adc[], qadc_rheo_state_t &adc_rheo_state){
+    printf("Running QADC in single shot mode using function call!\n");
+
+    int t0, t1; // For timing the ADC read
+    timer tmr;
+
+    while(1){
+        uint32_t adc[NUM_ADC];
+
+        printf("Read ADC ");
+        for(unsigned ch = 0; ch < NUM_ADC; ch++){
+            // This blocks until the conversion is complete
+            tmr :> t0;
+            adc[ch] = qadc_rheo_single(p_adc, ch, adc_rheo_state);
+            tmr :> t1;
+            printf("ch %u: %u (microseconds: %d), ", ch, adc[ch], (t1 - t0) / XS1_TIMER_MHZ);
         }
         putchar('\n');
         delay_milliseconds(100);
     }
 }
 
-// extern float find_threshold_level(float v_rail, port p);
 
 int main() {
     par{
         on tile[1]:{
-            chan c_adc;
-
             const unsigned capacitor_pf = 8800;        // Set the capacitor value here
             const unsigned potentiometer_ohms = 10000; // Set the potenitiometer nominal maximum value (end to end)
             const unsigned resistor_series_ohms = 220; // Set the series resistor value here
@@ -59,13 +99,35 @@ int main() {
 
             qadc_rheo_state_t adc_rheo_state;
             uint16_t state_buffer[QADC_RHEO_STATE_SIZE(NUM_ADC, FILTER_DEPTH)];
-            qadc_rheo_init(p_adc, NUM_ADC, NUM_STEPS, FILTER_DEPTH, HYSTERESIS, state_buffer, adc_config, adc_rheo_state);
+
+            // Only use moving average filter if in continuous mode
+            unsigned used_filter_depth = (CONTINUOUS == 1) ? FILTER_DEPTH : 1;
+            qadc_rheo_init(p_adc, NUM_ADC, NUM_STEPS, used_filter_depth, HYSTERESIS, state_buffer, adc_config, adc_rheo_state);
             
+ #if (CONTINUOUS == 1)
+// The continuous mode allows for a shared memory interface if the QADC is on the same tile.
+#if USE_SHARED_MEMORY
+            unsafe {
+                uint16_t * unsafe result_ptr = adc_rheo_state.results;
+
+                par
+                {
+                    qadc_rheo_task(NULL, p_adc, adc_rheo_state);
+                    control_task(NULL, result_ptr);
+                }
+            }
+#else
+            chan c_adc;
+
             par
             {
                 qadc_rheo_task(c_adc, p_adc, adc_rheo_state);
-                control_task(c_adc);
+                control_task(c_adc, NULL);
             }
+#endif // USE_SHARED_MEMORY
+#else
+            qadc_rheo_single_example(p_adc, adc_rheo_state);
+#endif // (CONTINUOUS == 1)
         }
     }
 

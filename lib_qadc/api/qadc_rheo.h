@@ -89,7 +89,7 @@ void qadc_rheo_init(port p_adc[],
 uint16_t qadc_rheo_single(port p_adc[], unsigned adc_idx, REFERENCE_PARAM(qadc_rheo_state_t, adc_rheo_state));
 
 #if defined(__XC__) || defined(__DOXYGEN__)
-void qadc_rheo_task(chanend c_adc, port p_adc[], REFERENCE_PARAM(qadc_rheo_state_t, adc_rheo_state));
+void qadc_rheo_task(NULLABLE_RESOURCE(chanend, c_adc), port p_adc[], REFERENCE_PARAM(qadc_rheo_state_t, adc_rheo_state));
 #else
 DECLARE_JOB(qadc_rheo_task, (chanend_t, port_t*, qadc_rheo_state_t*));
 /**

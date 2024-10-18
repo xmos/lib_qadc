@@ -51,7 +51,7 @@ void control_task(chanend ?c_adc, uint16_t * unsafe result_ptr){
                 printf("Restarting ADC...\n");
                 c_adc <: (uint32_t)QADC_CMD_STOP_CONV;
                 delay_milliseconds(1000); // Time to read the actual pot voltage
-                c_adc <: (uint32_t)QADC_CMD_STOP_CONV;
+                c_adc <: (uint32_t)QADC_CMD_START_CONV;
                 counter = 0;
                 delay_milliseconds(100);
             }
@@ -79,7 +79,6 @@ void qadc_pot_single_example(port p_adc[], qadc_pot_state_t &adc_pot_state){
         putchar('\n');
         delay_milliseconds(100);
     }
-
 }
 
 
