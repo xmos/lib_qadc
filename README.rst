@@ -51,13 +51,13 @@ Related Application Notes
 
   * None
 
-Two simple examples, designed to run on the ``XK-EVK-XU316`` (xcore.ai explorer) board, can be found in the ``/examples`` directory.
+Two simple examples, ported to run on the ``XK-EVK-XU316`` (xcore.ai explorer) board, can be found in the ``/examples`` directory.
 
 ************
 Known Issues
 ************
 
-  * None
+  * Auto calibration mode not yet implemented for Rheostat reader.
 
 **************
 Required Tools

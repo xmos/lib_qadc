@@ -9,7 +9,7 @@ documentation:
   substitutions_path: doc/substitutions.inc
   root_doc: doc/rst/qadc.rst
   linkcheck_ignore_regex: ['']
-  cognidox_part_number: XM-XXXXX-UG
+  cognidox_part_number: XM-015184-UG
   doxygen_projects:
     lib_qadc:
       doxyfile_path: doc/Doxyfile.inc
@@ -22,4 +22,4 @@ documentation:
       pdf_filename: '{{lib_name}}_v{{version}}_readme'
       pdf_short: yes
 software:
-  cognidox_part_number: XM-XXXXX-SM
+  cognidox_part_number: XM-015183-SM
