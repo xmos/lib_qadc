@@ -202,6 +202,7 @@ static inline uint16_t post_process_result( uint16_t raw_result, unsigned adc_id
     }
 }
 
+
 // Struct which contains the various timings and event triggers for the conversion
 typedef struct pot_timings_t{
     int32_t time_trigger_charge;
@@ -215,7 +216,24 @@ typedef struct pot_timings_t{
 }pot_timings_t;
 
 
-void do_adc_charge(port p_adc[], unsigned adc_idx, qadc_pot_state_t &adc_pot_state, pot_timings_t &pot_timings){
+static void do_adc_timing_init(port p_adc[], qadc_pot_state_t &adc_pot_state, pot_timings_t &pot_timings){
+    // Work out timing limits
+    const unsigned capacitor_pf = adc_pot_state.adc_config.capacitor_pf;
+    const unsigned potentiometer_ohms = adc_pot_state.adc_config.potentiometer_ohms;
+    const int rc_times_to_charge_fully = 5; // 5 RC times should be sufficient to reach rail
+    pot_timings.max_charge_period_ticks = ((uint64_t)rc_times_to_charge_fully * capacitor_pf * potentiometer_ohms / 4) / 10000;
+
+    pot_timings.max_discharge_period_ticks = (adc_pot_state.max_lut_ticks_up > adc_pot_state.max_lut_ticks_down ?
+                                                adc_pot_state.max_lut_ticks_up : adc_pot_state.max_lut_ticks_down);
+
+    dprintf("convert_interval_ticks: %d max charge/discharge_period: %lu\n", adc_pot_state.adc_config.convert_interval_ticks, pot_timings.max_charge_period_ticks + pot_timings.max_discharge_period_ticks);
+    dprintf("max_charge_period_ticks: %lu max_dis_period_ticks (up/down): (%lu,%lu), crossover_idx: %u\n",
+            pot_timings.max_charge_period_ticks, adc_pot_state.max_lut_ticks_up, adc_pot_state.max_lut_ticks_down, adc_pot_state.crossover_idx);
+    assert(adc_pot_state.adc_config.convert_interval_ticks > pot_timings.max_charge_period_ticks + pot_timings.max_discharge_period_ticks * 2); // Ensure conversion rate is low enough. *2 to allow post processing time
+}
+
+
+static void do_adc_charge(port p_adc[], unsigned adc_idx, qadc_pot_state_t &adc_pot_state, pot_timings_t &pot_timings){
     unsafe{
         p_adc[adc_idx] :> adc_pot_state.init_port_val[adc_idx];
         unsigned is_up = adc_pot_state.init_port_val[adc_idx];
@@ -230,14 +248,14 @@ void do_adc_charge(port p_adc[], unsigned adc_idx, qadc_pot_state_t &adc_pot_sta
     }
 }
 
-void do_adc_start_convert(port p_adc[], unsigned adc_idx, qadc_pot_state_t &adc_pot_state, pot_timings_t &pot_timings){
+static void do_adc_start_convert(port p_adc[], unsigned adc_idx, qadc_pot_state_t &adc_pot_state, pot_timings_t &pot_timings){
     p_adc[adc_idx] :> int _ @ pot_timings.start_time; // Make Hi Z and grab port time
     // Set up an event to handle if port doesn't reach oppositie value. Set at double the max expected time. This is a fairly fatal 
     // event which is caused by severe mismatch of hardware vs init params
     pot_timings.time_trigger_overshoot = pot_timings.time_trigger_start_convert + (pot_timings.max_ticks_expected * 2);
 }
 
-void do_adc_convert(port p_adc[], unsigned adc_idx, qadc_pot_state_t &adc_pot_state, pot_timings_t &pot_timings){
+static void do_adc_convert(port p_adc[], unsigned adc_idx, qadc_pot_state_t &adc_pot_state, pot_timings_t &pot_timings){
     unsafe{
         int32_t conversion_time = (pot_timings.end_time - pot_timings.start_time);
         if(conversion_time < 0){
@@ -299,7 +317,7 @@ void do_adc_convert(port p_adc[], unsigned adc_idx, qadc_pot_state_t &adc_pot_st
 }
 
 
-void do_adc_handle_overshoot(port p_adc[], unsigned adc_idx, qadc_pot_state_t &adc_pot_state, pot_timings_t &pot_timings){
+static void do_adc_handle_overshoot(port p_adc[], unsigned adc_idx, qadc_pot_state_t &adc_pot_state, pot_timings_t &pot_timings){
     unsigned overshoot_port_val = 0;
     p_adc[adc_idx] :> overshoot_port_val; // For debug only.
 
@@ -322,23 +340,6 @@ void do_adc_handle_overshoot(port p_adc[], unsigned adc_idx, qadc_pot_state_t &a
     }
 }
 
-
-void do_adc_timing_init(port p_adc[], qadc_pot_state_t &adc_pot_state, pot_timings_t &pot_timings){
-    // Work out timing limits
-    const unsigned capacitor_pf = adc_pot_state.adc_config.capacitor_pf;
-    const unsigned potentiometer_ohms = adc_pot_state.adc_config.potentiometer_ohms;
-    const int rc_times_to_charge_fully = 5; // 5 RC times should be sufficient to reach rail
-    pot_timings.max_charge_period_ticks = ((uint64_t)rc_times_to_charge_fully * capacitor_pf * potentiometer_ohms / 4) / 10000;
-
-    pot_timings.max_discharge_period_ticks = (adc_pot_state.max_lut_ticks_up > adc_pot_state.max_lut_ticks_down ?
-                                                adc_pot_state.max_lut_ticks_up : adc_pot_state.max_lut_ticks_down);
-
-    dprintf("convert_interval_ticks: %d max charge/discharge_period: %lu\n", adc_pot_state.adc_config.convert_interval_ticks, pot_timings.max_charge_period_ticks + pot_timings.max_discharge_period_ticks);
-    dprintf("max_charge_period_ticks: %lu max_dis_period_ticks (up/down): (%lu,%lu), crossover_idx: %u\n",
-            pot_timings.max_charge_period_ticks, adc_pot_state.max_lut_ticks_up, adc_pot_state.max_lut_ticks_down, adc_pot_state.crossover_idx);
-    assert(adc_pot_state.adc_config.convert_interval_ticks > pot_timings.max_charge_period_ticks + pot_timings.max_discharge_period_ticks * 2); // Ensure conversion rate is low enough. *2 to allow post processing time
-
-}
 
 void qadc_pot_task(chanend ?c_adc, port p_adc[], qadc_pot_state_t &adc_pot_state){
     dprintf("adc_pot_task\n");

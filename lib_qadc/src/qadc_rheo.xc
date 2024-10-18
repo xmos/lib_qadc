@@ -184,87 +184,79 @@ static inline uint16_t post_process_result( uint16_t raw_result, unsigned adc_id
 }
 
 
+// Struct which contains the various timings and event triggers for the conversion
+typedef struct rheo_timings_t{
+    int32_t time_trigger_charge;
+    int32_t time_trigger_discharge;
+    int32_t time_trigger_overshoot;
+    int32_t max_ticks_expected;
+    uint32_t max_charge_period_ticks;
+    uint32_t max_discharge_period_ticks;
+    int16_t start_time;
+    int16_t end_time;
+}rheo_timings_t;
+
+static void do_adc_timing_init(port p_adc[], qadc_rheo_state_t &adc_rheo_state, rheo_timings_t &rheo_timings){
+
+    const uint32_t convert_interval_ticks = adc_rheo_state.adc_config.convert_interval_ticks;
+    const unsigned capacitor_pf = adc_rheo_state.adc_config.capacitor_pf;
+    const unsigned resistor_series_ohms = adc_rheo_state.adc_config.resistor_series_ohms;
+    const int rc_times_to_charge_fully = 5; // 5 RC times should be sufficient but use double for best scaling
+    rheo_timings.max_charge_period_ticks = ((uint64_t)rc_times_to_charge_fully * capacitor_pf * resistor_series_ohms) / 10000;
+
+    assert(convert_interval_ticks > rheo_timings.max_charge_period_ticks + adc_rheo_state.max_disch_ticks * 2); // Ensure conversion rate is low enough. *2 to allow post processing time
+    dprintf("max_charge_period_ticks: %lu max_discharge_period_ticks: %lu\n", rheo_timings.max_charge_period_ticks, adc_rheo_state.max_disch_ticks);
+}
+
 void qadc_rheo_task(chanend c_adc, port p_adc[], qadc_rheo_state_t &adc_rheo_state){
     // Current conversion index
     unsigned adc_idx = 0;
+    // Mode
     adc_mode_t adc_mode = ADC_CONVERT;
 
-
+    // Timers for state machine
     timer tmr_charge;
     timer tmr_discharge;
     timer tmr_overshoot;
 
-    // Set all ports to input and set drive strength
-    const int port_drive = DRIVE_2MA;
-    for(int i = 0; i < adc_rheo_state.num_adc; i++){
-        unsigned dummy;
-        p_adc[i] :> dummy;
-        set_pad_properties(p_adc[i], port_drive, PULL_NONE, 0, 0);
+    // Timing struct
+    rheo_timings_t rheo_timings = {0};
 
-    }
+    do_adc_timing_init(p_adc, adc_rheo_state, rheo_timings);
 
-    const uint32_t convert_interval_ticks = adc_rheo_state.adc_config.convert_interval_ticks;
-
-
-    const unsigned capacitor_pf = adc_rheo_state.adc_config.capacitor_pf;
-    const unsigned resistor_series_ohms = adc_rheo_state.adc_config.resistor_series_ohms;
-    const int rc_times_to_charge_fully = 10; // 5 RC times should be sufficient but use double for best scaling
-    const uint32_t max_charge_period_ticks = ((uint64_t)rc_times_to_charge_fully * capacitor_pf * resistor_series_ohms) / 10000;
-
-    assert(convert_interval_ticks > max_charge_period_ticks + adc_rheo_state.max_disch_ticks * 2); // Ensure conversion rate is low enough. *2 to allow post processing time
-    dprintf("max_charge_period_ticks: %lu max_discharge_period_ticks: %lu\n", max_charge_period_ticks, adc_rheo_state.max_disch_ticks);
-
-
- 
+    // Setup initial state
     adc_state_t adc_state = ADC_IDLE;
 
     // Set init time for charge
-    int time_trigger_charge = 0;
-    tmr_charge :> time_trigger_charge;
-    time_trigger_charge += max_charge_period_ticks; // start in one conversion period's
-    
-    int time_trigger_discharge = 0;
-    int time_trigger_overshoot = 0;
+    tmr_charge :> rheo_timings.time_trigger_charge;
+    rheo_timings.time_trigger_charge += rheo_timings.max_charge_period_ticks; // start in one charge period
 
-    int16_t start_time = 0, end_time = 0;
+    // Extract for readibility
+    const uint32_t convert_interval_ticks = adc_rheo_state.adc_config.convert_interval_ticks;
 
     while(1){
         select{
-            case adc_state == ADC_IDLE => tmr_charge when timerafter(time_trigger_charge) :> int _:
+            case adc_state == ADC_IDLE => tmr_charge when timerafter(rheo_timings.time_trigger_charge) :> int _:
 
-                time_trigger_discharge = time_trigger_charge + max_charge_period_ticks;
+                rheo_timings.time_trigger_discharge = rheo_timings.time_trigger_charge +rheo_timings.max_charge_period_ticks;
                 p_adc[adc_idx] <: 0x1;
                 adc_state = ADC_CHARGING;
             break;
 
-            case adc_state == ADC_CHARGING => tmr_discharge when timerafter(time_trigger_discharge) :> int _:
-                p_adc[adc_idx] :> int _ @ start_time; // Make Hi Z and grab time
-                time_trigger_overshoot = time_trigger_discharge + adc_rheo_state.max_disch_ticks * 2;
+            case adc_state == ADC_CHARGING => tmr_discharge when timerafter(rheo_timings.time_trigger_discharge) :> int _:
+                p_adc[adc_idx] :> int _ @ rheo_timings.start_time; // Make Hi Z and grab time
+                rheo_timings.time_trigger_overshoot = rheo_timings.time_trigger_discharge + adc_rheo_state.max_disch_ticks * 2;
 
                 adc_state = ADC_CONVERTING;
             break;
 
-            case adc_state == ADC_CONVERTING => p_adc[adc_idx] when pinseq(0x0) :> int _ @ end_time:
-                int32_t conversion_time = (end_time - start_time);
+            case adc_state == ADC_CONVERTING => p_adc[adc_idx] when pinseq(0x0) :> int _ @ rheo_timings.end_time:
+                int32_t conversion_time = (rheo_timings.end_time - rheo_timings.start_time);
                 if(conversion_time < 0){
                     conversion_time += 0x10000; // Account for port timer wrapping
                 }
                 int t0, t1;
                 tmr_charge :> t0; 
-                // uint16_t post_proc_result = post_process_result(conversion_time,
-                //                                                 adc_rheo_state.adc_steps,
-                //                                                 &adc_rheo_state.port_time_offset,
-                //                                                 adc_rheo_state.max_disch_ticks,
-                //                                                 adc_rheo_state.max_scale,
-                //                                                 adc_rheo_state.max_seen_ticks,
-                //                                                 adc_rheo_state.conversion_history,
-                //                                                 adc_rheo_state.hysteris_tracker,
-                //                                                 adc_rheo_state.filter_depth,
-                //                                                 adc_rheo_state.result_hysteresis,
-                //                                                 adc_idx,
-                //                                                 adc_rheo_state.num_adc,
-                //                                                 adc_mode);
-
                 uint16_t post_proc_result = post_process_result(conversion_time,
                                                                 adc_idx,
                                                                 adc_rheo_state,
@@ -278,19 +270,19 @@ void qadc_rheo_task(chanend c_adc, port p_adc[], qadc_rheo_state_t &adc_rheo_sta
                 if(++adc_idx == adc_rheo_state.num_adc){
                     adc_idx = 0;
                 }
-                time_trigger_charge += convert_interval_ticks;
+                rheo_timings.time_trigger_charge += convert_interval_ticks;
 
                 adc_state = ADC_IDLE;
             break;
 
-            case (adc_state == ADC_CONVERTING) => tmr_overshoot when timerafter(time_trigger_overshoot) :> int _:
-                p_adc[adc_idx] :> int _ @ end_time;
+            case (adc_state == ADC_CONVERTING) => tmr_overshoot when timerafter(rheo_timings.time_trigger_overshoot) :> int _:
+                p_adc[adc_idx] :> int _ @ rheo_timings.end_time;
                 unsafe{adc_rheo_state.results[adc_idx] = adc_rheo_state.adc_steps - 1;}
-                dprintf("ticks: %u overshoot \n", end_time - start_time);
+                dprintf("ticks: %u overshoot \n", rheo_timings.end_time - rheo_timings.start_time);
                 if(++adc_idx == adc_rheo_state.num_adc){
                     adc_idx = 0;
                 }
-                time_trigger_charge += convert_interval_ticks;
+                rheo_timings.time_trigger_charge += convert_interval_ticks;
 
                 adc_state = ADC_IDLE;
             break;
@@ -308,8 +300,8 @@ void qadc_rheo_task(chanend c_adc, port p_adc[], qadc_rheo_state_t &adc_rheo_sta
                         adc_state = ADC_STOPPED;
                     break;
                     case QADC_CMD_START_CONV:
-                        tmr_charge :> time_trigger_charge;
-                        time_trigger_charge += max_charge_period_ticks; // start in one conversion period's
+                        tmr_charge :> rheo_timings.time_trigger_charge;
+                        rheo_timings.time_trigger_charge += rheo_timings.max_charge_period_ticks; // start in one conversion period's
                         // Clear all history apart from scaling
                         memset(adc_rheo_state.results, 0, adc_rheo_state.hysteris_tracker - adc_rheo_state.results);
                         adc_state = ADC_IDLE;
@@ -326,4 +318,31 @@ void qadc_rheo_task(chanend c_adc, port p_adc[], qadc_rheo_state_t &adc_rheo_sta
     } // while 1
 }
 
+uint16_t qadc_rheo_single(port p_adc[], unsigned adc_idx, qadc_rheo_state_t &adc_rheo_state){
+    int16_t result = 0;
+
+    timer tmr_single;
+
+    rheo_timings_t rheo_timings = {0};
+    do_adc_timing_init(p_adc, adc_rheo_state, rheo_timings);
+    tmr_single :> rheo_timings.time_trigger_charge; // Set origin time. This is the datum for the following events.
+    // do_adc_charge(p_adc, adc_idx, adc_pot_state, rheo_timings); // Start charging
+    // tmr_single when timerafter(rheo_timings.time_trigger_start_convert) :> int _; // Wait until fully charged
+    // do_adc_start_convert(p_adc, adc_idx, adc_pot_state, rheo_timings);
+
+    // // Now wait for conversion or overshoot timeout event
+    // unsafe{
+    //     select{
+    //         case p_adc[adc_idx] when pinseq(adc_pot_state.init_port_val[adc_idx]) :> int _ @ rheo_timings.end_time:
+    //             do_adc_convert(p_adc, adc_idx, adc_pot_state, rheo_timings);
+    //         break;
+    //         case tmr_single when timerafter(pot_timings.time_trigger_overshoot) :> int _:
+    //             do_adc_handle_overshoot(p_adc, adc_idx, adc_pot_state, rheo_timings);
+    //         break;
+    //     }
+    //     result = adc_pot_state.results[adc_idx];
+    // }
+    
+    return result;
+}
 
