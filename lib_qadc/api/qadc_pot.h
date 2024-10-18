@@ -16,8 +16,8 @@ typedef struct qadc_pot_state_t{
     unsigned result_hysteresis;
     uint16_t * UNSAFE results;
     qadc_config_t adc_config;
-    uint16_t * UNSAFE cal_up;
-    uint16_t * UNSAFE cal_down;
+    uint16_t * UNSAFE lut_up;
+    uint16_t * UNSAFE lut_down;
     uint32_t max_lut_ticks_up;
     uint32_t max_lut_ticks_down;
     uint16_t * UNSAFE max_seen_ticks_up;
