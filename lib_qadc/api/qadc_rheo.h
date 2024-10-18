@@ -23,6 +23,7 @@ typedef struct qadc_rheo_state_t{
     uint16_t port_time_offset;
     uint16_t * UNSAFE conversion_history;
     uint16_t * UNSAFE hysteris_tracker;
+    uint16_t * UNSAFE filter_write_idx;
 }qadc_rheo_state_t;
 
 
@@ -36,15 +37,14 @@ typedef struct qadc_rheo_state_t{
  * @{
  */
 
-// results, filter, hysteresis, max_ticks, scale
 #define QADC_RHEO_STATE_SIZE( num_adc, filter_depth)                     (( \
-                             (sizeof(uint16_t) * num_adc) +                 \
-                             (sizeof(uint16_t) * num_adc * filter_depth) +  \
-                             (sizeof(uint16_t) * num_adc) +                 \
-                             (sizeof(uint16_t) * num_adc) +                 \
-                             (sizeof(uint16_t) * num_adc) +                 \
+    /* results */            (sizeof(uint16_t) * num_adc) +                 \
+    /* conversion_history */ (sizeof(uint16_t) * num_adc * filter_depth) +  \
+    /* hysteris_tracker */   (sizeof(uint16_t) * num_adc) +                 \
+    /* max_seen_ticks*/      (sizeof(uint16_t) * num_adc) +                 \
+    /* max_scale */          (sizeof(uint16_t) * num_adc) +                 \
+    /* filter_write_idx */   (sizeof(uint16_t) * num_adc) +                 \
                              (sizeof(uint16_t) - 1)) / sizeof(uint16_t))
-
 
 /**
  * Initialise a QADC rheostate reader instance and initialise the qadc_rheo_state structure. 

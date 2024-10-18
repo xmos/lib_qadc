@@ -48,18 +48,22 @@ typedef struct qadc_config_t{
  * @{
  */
 
-/** 
- * @brief   Channel communication commands for the adc task. Please OR this with
- *          the operand in cases where a channel index is needed.
- */
-#define QADC_CMD_READ                0x01000000ULL       /** Read an ADC channel, arg: channel number in LSB. */  
-#define QADC_CMD_CAL_MODE_START      0x02000000ULL       /** Start calibration mode. Move the potentiometer end to end to determine limits. */
-#define QADC_CMD_CAL_MODE_FINISH     0x03000000ULL       /** Stop calibration mode and use new observed limits. */
-#define QADC_CMD_POT_GET_DIR         0x04000000ULL       /** Read the conversion direction. Potentiometer QADC only. (1 = High to low, 0 = Low to high) of an ADC channel, arg: channel number in LSB. */
-#define QADC_CMD_STOP_CONV           0x05000000ULL       /** Temporarily stop conversion. */
-#define QADC_CMD_START_CONV          0x06000000ULL       /** Restart conversion. */
-#define QADC_CMD_EXIT                0x07000000ULL       /** Exit the qadc_pot_task(). */
-#define QADC_CMD_MASK                0xff000000ULL       /** Mask word used for building commands */
+/** @brief Read an ADC channel, arg: channel number in LSB. Please OR the cmd with the operand. */
+#define QADC_CMD_READ                0x01000000ULL
+/** @brief Start calibration mode. Move the potentiometer end to end to determine limits. */
+#define QADC_CMD_CAL_MODE_START      0x02000000ULL
+/** @brief Stop calibration mode and use new observed limits. */
+#define QADC_CMD_CAL_MODE_FINISH     0x03000000ULL
+/** @brief Read the conversion direction. Potentiometer QADC only. (1 = High to low, 0 = Low to high) of an ADC channel, arg: channel number in LSB.  Please OR the cmd with the operand.*/
+#define QADC_CMD_POT_GET_DIR         0x04000000ULL
+/** @brief Temporarily stop conversion. */
+#define QADC_CMD_STOP_CONV           0x05000000ULL
+/** @brief Restart conversion. */
+#define QADC_CMD_START_CONV          0x06000000ULL
+/** @brief Exit the qadc_pot_task(). */
+#define QADC_CMD_EXIT                0x07000000ULL
+/** @brief Mask word used for building commands */
+#define QADC_CMD_MASK                0xff000000ULL
 
 
 /** 

@@ -7,12 +7,12 @@
 
 #include "qadc.h"
 
-#define NUM_ADC         1
+#define NUM_ADC         2
 #define FILTER_DEPTH    32
 #define HYSTERESIS      1
 #define NUM_STEPS       1024
 
-on tile[1]: port p_adc[] = {XS1_PORT_1M}; // Sets which pins are to be used (channels 0..n) X1D36 on explorer board
+on tile[1]: port p_adc[] = {XS1_PORT_1M, XS1_PORT_1O}; // Sets which pins are to be used (channels 0..n) X1D36/38
 
 
 void control_task(chanend c_adc){
@@ -39,15 +39,15 @@ int main() {
         on tile[1]:{
             chan c_adc;
 
-            const unsigned capacitor_pf = 2000;
-            const unsigned potentiometer_ohms = 47000; // nominal maximum value ned to end
-            const unsigned resistor_series_ohms = 470;
+            const unsigned capacitor_pf = 8800;        // Set the capacitor value here
+            const unsigned potentiometer_ohms = 10000; // Set the potenitiometer nominal maximum value (end to end)
+            const unsigned resistor_series_ohms = 220; // Set the series resistor value here
 
             const float v_rail = 3.3;
             const float v_thresh = 1.15;
             const char auto_scale = 0;
 
-            const unsigned convert_interval_ticks = (50 * XS1_TIMER_KHZ);
+            const unsigned convert_interval_ticks = (1 * XS1_TIMER_KHZ);
             
             const qadc_config_t adc_config = {capacitor_pf,
                                                 potentiometer_ohms,

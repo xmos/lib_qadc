@@ -169,7 +169,6 @@ static inline uint16_t post_process_result( uint16_t raw_result, unsigned adc_id
         unsigned result_hysteresis = adc_pot_state.result_hysteresis;
         uint16_t *unsafe filter_write_idx = adc_pot_state.filter_write_idx;
 
-
         // Apply filter. First populate filter history.
         unsigned offset = adc_idx * result_history_depth + filter_write_idx[adc_idx];
         *(conversion_history + offset) = raw_result;

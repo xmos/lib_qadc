@@ -28,107 +28,6 @@ typedef enum adc_mode_t{
         ADC_CALIBRATION_AUTO        // WIP
 }adc_mode_t;
 
-static inline uint16_t post_process_result( uint16_t discharge_elapsed_time,
-                                            size_t adc_steps,
-                                            uint16_t *zero_offset_ticks,
-                                            uint16_t max_discharge_period_ticks,
-                                            uint16_t * unsafe max_scale,
-                                            uint16_t * unsafe max_seen_ticks,
-                                            uint16_t * unsafe conversion_history,
-                                            uint16_t * unsafe hysteris_tracker,
-                                            size_t result_history_depth,
-                                            unsigned result_hysteresis,
-                                            unsigned adc_idx,
-                                            unsigned num_ports,
-                                            adc_mode_t adc_mode
-                                            ){
-
-    unsafe{
-        // Apply filter. First populate filter history.
-        static unsigned filter_write_idx = 0;
-        static unsigned filter_stable = 0;
-        unsigned offset = adc_idx * result_history_depth + filter_write_idx;
-        *(conversion_history + offset) = discharge_elapsed_time;
-        if(adc_idx == num_ports - 1){
-            if(++filter_write_idx == result_history_depth){
-                filter_write_idx = 0;
-                filter_stable = 1;
-            }
-        }
-        // Moving average filter
-        int accum = 0;
-        uint16_t * unsafe hist_ptr = conversion_history + adc_idx * result_history_depth;
-        for(int i = 0; i < result_history_depth; i++){
-            accum += *hist_ptr;
-            hist_ptr++;
-        }
-        uint16_t filtered_elapsed_time = accum / result_history_depth;
-
-        // Remove zero offset and clip negative
-        int zero_offsetted_ticks = filtered_elapsed_time - *zero_offset_ticks;
-        if(zero_offsetted_ticks < 0){
-            if(filter_stable){
-                // *zero_offset_ticks += (zero_offsetted_ticks / 2); // Move zero offset halfway to compensate gradually
-            }
-            zero_offsetted_ticks = 0;
-        }
-
-        // Track maximums
-        if(zero_offsetted_ticks > max_seen_ticks[adc_idx]){
-            max_seen_ticks[adc_idx] = zero_offsetted_ticks;
-            // Scale here if using calib
-            // max_scale[adc_idx] = max_seen_ticks[adc_idx] << QADC_Q_3_13_SHIFT / max_discharge_period_ticks or something
-        }
-        dprintf("max_seen: %u\n", max_seen_ticks[adc_idx]);
-
-        // TODO scale to max or just use max seen and remove max_scale?
-        // ticks = ((int64_t)max_scale_up * (int64_t)ticks) >> QADC_Q_3_13_SHIFT;
-
-        // Clip positive
-        if(zero_offsetted_ticks > max_discharge_period_ticks){
-            zero_offsetted_ticks = max_discharge_period_ticks;
-        }
-
-
-        // Calculate scaled output
-        uint16_t scaled_result = 0;
-        scaled_result = ((adc_steps - 1) * zero_offsetted_ticks) / max_discharge_period_ticks;
-
-        // Apply hysteresis
-        if(scaled_result > hysteris_tracker[adc_idx] + result_hysteresis || scaled_result == (adc_steps - 1)){
-            hysteris_tracker[adc_idx] = scaled_result;
-        }
-        if(scaled_result < hysteris_tracker[adc_idx] - result_hysteresis || scaled_result == 0){
-            hysteris_tracker[adc_idx] = scaled_result;
-        }
-
-        scaled_result = hysteris_tracker[adc_idx];
-
-        return scaled_result;
-    }
-}
-
-
-// TODO make weak in C
-// static uint16_t stored_max[ADC_MAX_NUM_CHANNELS] = {0};
-// int adc_save_calibration(unsigned max_offsetted_conversion_time[], unsigned num_ports)
-// {
-//     for(int i = 0; i < num_ports; i++){
-//         stored_max[i] = max_offsetted_conversion_time[i];
-//     }
-
-//     return 0; // Success
-// }
-
-// int adc_load_calibration(unsigned max_offsetted_conversion_time[], unsigned num_ports)
-// {
-//     for(int i = 0; i < num_ports; i++){
-//         max_offsetted_conversion_time[i] = stored_max[i];
-//     }
-
-//     return 0; // Success
-// }
-
 
 void qadc_rheo_init( port p_adc[],
                     size_t num_adc,
@@ -156,8 +55,7 @@ void qadc_rheo_init( port p_adc[],
         adc_rheo_state.adc_config.convert_interval_ticks = adc_config.convert_interval_ticks;
         adc_rheo_state.adc_config.auto_scale = adc_config.auto_scale;
 
-        // Calc
-
+        // Grab vars and scale
         const float v_rail = adc_config.v_rail;
         const float v_thresh = adc_config.v_thresh;
         const float r_rheo_max = adc_config.potentiometer_ohms;
@@ -189,6 +87,8 @@ void qadc_rheo_init( port p_adc[],
         ptr += num_adc;
         adc_rheo_state.max_scale = ptr;
         ptr += num_adc;
+        adc_rheo_state.filter_write_idx = ptr;
+        ptr += num_adc;
 
         unsigned limit = (unsigned)state_buffer + sizeof(uint16_t) * QADC_RHEO_STATE_SIZE(num_adc, filter_depth);
         assert(ptr == limit);
@@ -207,6 +107,79 @@ void qadc_rheo_init( port p_adc[],
             // Simulator doesn't like setc so only do for hardware. isSimulation() takes 100ms or so per port so do here.
             if(!isSimulation()) set_pad_properties(p_adc[i], port_drive, PULL_NONE, 1, 0);
         }
+    }
+}
+
+static inline uint16_t post_process_result( uint16_t raw_result, unsigned adc_idx, qadc_rheo_state_t &adc_rheo_state, adc_mode_t adc_mode){
+  unsafe{
+        // Extract vars for readibility
+        uint16_t *unsafe conversion_history = adc_rheo_state.conversion_history;
+        uint16_t *unsafe hysteris_tracker = adc_rheo_state.hysteris_tracker;
+        size_t num_adc = adc_rheo_state.num_adc;
+        size_t result_history_depth = adc_rheo_state.filter_depth;
+        size_t adc_steps = adc_rheo_state.adc_steps;
+        unsigned result_hysteresis = adc_rheo_state.result_hysteresis;
+        uint16_t *unsafe filter_write_idx = adc_rheo_state.filter_write_idx;
+        uint16_t max_discharge_period_ticks = adc_rheo_state.max_disch_ticks;
+        uint16_t *zero_offset_ticks = &adc_rheo_state.port_time_offset;
+        uint16_t * unsafe max_scale = adc_rheo_state.max_scale;
+        uint16_t * unsafe max_seen_ticks = adc_rheo_state.max_seen_ticks;
+
+        // Apply filter. First populate filter history.
+        unsigned offset = adc_idx * result_history_depth + filter_write_idx[adc_idx];
+        *(conversion_history + offset) = raw_result;
+
+        if(++filter_write_idx[adc_idx] == result_history_depth){
+            filter_write_idx[adc_idx] = 0;
+        }
+
+        // Moving average filter
+        int accum = 0;
+        uint16_t * unsafe hist_ptr = conversion_history + adc_idx * result_history_depth;
+        for(int i = 0; i < result_history_depth; i++){
+            accum += *hist_ptr;
+            hist_ptr++;
+        }
+        uint16_t filtered_elapsed_time = accum / result_history_depth;
+
+        // Remove zero offset and clip negative
+        int zero_offsetted_ticks = filtered_elapsed_time - *zero_offset_ticks;
+        if(zero_offsetted_ticks < 0){
+            // *zero_offset_ticks += (zero_offsetted_ticks / 2); // Move zero offset halfway to compensate gradually
+            zero_offsetted_ticks = 0;
+        }
+
+        // Track maximums
+        if(zero_offsetted_ticks > max_seen_ticks[adc_idx]){
+            max_seen_ticks[adc_idx] = zero_offsetted_ticks;
+            // Scale here if using calib
+            // max_scale[adc_idx] = max_seen_ticks[adc_idx] << QADC_Q_3_13_SHIFT / max_discharge_period_ticks or something
+        }
+        dprintf("max_seen: %u\n", max_seen_ticks[adc_idx]);
+
+        // TODO scale to max or just use max seen and remove max_scale?
+        // ticks = ((int64_t)max_scale_up * (int64_t)ticks) >> QADC_Q_3_13_SHIFT;
+
+        // Clip positive
+        if(zero_offsetted_ticks > max_discharge_period_ticks){
+            zero_offsetted_ticks = max_discharge_period_ticks;
+        }
+
+        // Calculate scaled output
+        uint16_t scaled_result = 0;
+        scaled_result = ((adc_steps - 1) * zero_offsetted_ticks) / max_discharge_period_ticks;
+
+        // Apply hysteresis
+        if(scaled_result > hysteris_tracker[adc_idx] + result_hysteresis || scaled_result == (adc_steps - 1)){
+            hysteris_tracker[adc_idx] = scaled_result;
+        }
+        if(scaled_result < hysteris_tracker[adc_idx] - result_hysteresis || scaled_result == 0){
+            hysteris_tracker[adc_idx] = scaled_result;
+        }
+
+        scaled_result = hysteris_tracker[adc_idx];
+
+        return scaled_result;
     }
 }
 
@@ -278,19 +251,25 @@ void qadc_rheo_task(chanend c_adc, port p_adc[], qadc_rheo_state_t &adc_rheo_sta
                 }
                 int t0, t1;
                 tmr_charge :> t0; 
+                // uint16_t post_proc_result = post_process_result(conversion_time,
+                //                                                 adc_rheo_state.adc_steps,
+                //                                                 &adc_rheo_state.port_time_offset,
+                //                                                 adc_rheo_state.max_disch_ticks,
+                //                                                 adc_rheo_state.max_scale,
+                //                                                 adc_rheo_state.max_seen_ticks,
+                //                                                 adc_rheo_state.conversion_history,
+                //                                                 adc_rheo_state.hysteris_tracker,
+                //                                                 adc_rheo_state.filter_depth,
+                //                                                 adc_rheo_state.result_hysteresis,
+                //                                                 adc_idx,
+                //                                                 adc_rheo_state.num_adc,
+                //                                                 adc_mode);
+
                 uint16_t post_proc_result = post_process_result(conversion_time,
-                                                                adc_rheo_state.adc_steps,
-                                                                &adc_rheo_state.port_time_offset,
-                                                                adc_rheo_state.max_disch_ticks,
-                                                                adc_rheo_state.max_scale,
-                                                                adc_rheo_state.max_seen_ticks,
-                                                                adc_rheo_state.conversion_history,
-                                                                adc_rheo_state.hysteris_tracker,
-                                                                adc_rheo_state.filter_depth,
-                                                                adc_rheo_state.result_hysteresis,
                                                                 adc_idx,
-                                                                adc_rheo_state.num_adc,
+                                                                adc_rheo_state,
                                                                 adc_mode);
+
                 unsafe{adc_rheo_state.results[adc_idx] = post_proc_result;}
                 tmr_charge :> t1; 
                 dprintf("ticks: %u post_proc: %u: proc_ticks: %d\n", conversion_time, post_proc_result, t1-t0);
