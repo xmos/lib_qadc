@@ -59,8 +59,7 @@ int main(void){
                                         .v_rail = 3.3,
                                         .v_thresh = 1.15,
                                         .auto_scale = 0,
-                                        .convert_interval_ticks = 1 * XS1_TIMER_KHZ,
-                                        .port_time_offset = 36};
+                                        .convert_interval_ticks = 1 * XS1_TIMER_KHZ};
 
     channel_t c_adc_pot = chan_alloc();
     channel_t c_adc_rheo = chan_alloc();

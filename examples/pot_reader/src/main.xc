@@ -94,7 +94,6 @@ int main() {
             const float v_thresh = 1.15;
             const char auto_scale = 0;
 
-            const uint16_t port_time_offset = 0;      // 36 for 120MHz thread speed. Use 56 for 75MHz thread speed
             const unsigned convert_interval_ticks = (1 * XS1_TIMER_KHZ); // 1 millisecond
             
             const qadc_config_t adc_config = {  capacitor_pf,
@@ -103,8 +102,7 @@ int main() {
                                                 v_rail,
                                                 v_thresh,
                                                 auto_scale,
-                                                convert_interval_ticks,
-                                                port_time_offset};
+                                                convert_interval_ticks};
 
             qadc_pot_state_t adc_pot_state;
 

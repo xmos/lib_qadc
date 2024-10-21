@@ -170,12 +170,6 @@ The included post processing steps are as follows:
 
 
 
-Zero Offset Removal
-...................
-
-There is a minimum time the architecture can setup a transition event on the port and the circuitry discharge a capacitor. The first post processing stage is therefore to remove this offset so that the zero scale (and full scale in the case of the potentiometer scheme) can be read as correctly. See the :ref:`QADC Tuning <tuning>` section for more details on setting this value.
-
-
 Moving Average Filter
 .....................
 
@@ -281,7 +275,7 @@ The ``qadc_config_t`` configuration can be initialised (using C in this example 
 
 .. literalinclude:: ../../tests/qadc_c_interface/src/main.c
    :start-at: const qadc_config_t adc_config
-   :end-at: TBD
+   :end-at: .convert_interval_ticks
 
 
 
