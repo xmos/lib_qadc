@@ -536,5 +536,7 @@ uint16_t qadc_pot_single(port p_adc[], unsigned adc_idx, qadc_pot_state_t &adc_p
         result = adc_pot_state.results[adc_idx];
     }
     
+    // DELAY
+
     return result;
 }

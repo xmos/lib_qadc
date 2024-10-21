@@ -375,6 +375,8 @@ uint16_t qadc_rheo_single(port p_adc[], unsigned adc_idx, qadc_rheo_state_t &adc
         }
         result = adc_rheo_state.results[adc_idx];
     }
+
+    //DELAY
     
     return result;
 }
