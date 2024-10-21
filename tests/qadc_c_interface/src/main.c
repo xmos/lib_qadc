@@ -57,8 +57,9 @@ int main(void){
                                         470,
                                         3.3,
                                         1.15,
+                                        1,
                                         1 * XS1_TIMER_KHZ,
-                                        1};
+                                        36};
 
     channel_t c_adc_pot = chan_alloc();
     channel_t c_adc_rheo = chan_alloc();

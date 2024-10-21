@@ -42,9 +42,10 @@ void parse_cmd_line(qadc_config_t &adc_config, unsigned argc, char * unsafe argv
 
 int main(unsigned argc, char * unsafe argv[argc]){
 
-    qadc_config_t adc_config;
+    qadc_config_t adc_config = {0};
     parse_cmd_line(adc_config, argc, argv);
     adc_config.convert_interval_ticks = (1 * XS1_TIMER_KHZ);
+    qadc_config.port_time_offset = 36;
     adc_config.auto_scale = 0;
 
     chan c_adc;

@@ -37,7 +37,6 @@ void qadc_pot_init( port p_adc[],
         adc_pot_state.lut_size = lut_size;
         adc_pot_state.filter_depth = filter_depth;
         adc_pot_state.result_hysteresis = result_hysteresis;
-        adc_pot_state.port_time_offset = 34; // Tested at 120MHz thread speed
 
         // Check all ports the same width
         unsigned num_ports = (adc_pot_state.num_adc + adc_pot_state.port_width - 1) / adc_pot_state.port_width;
@@ -54,6 +53,7 @@ void qadc_pot_init( port p_adc[],
         adc_pot_state.adc_config.resistor_series_ohms = adc_config.resistor_series_ohms;
         adc_pot_state.adc_config.v_rail = adc_config.v_rail;
         adc_pot_state.adc_config.v_thresh = adc_config.v_thresh;
+        adc_pot_state.adc_config.port_time_offset = adc_config.port_time_offset;
         adc_pot_state.adc_config.convert_interval_ticks = adc_config.convert_interval_ticks;
         adc_pot_state.adc_config.auto_scale = adc_config.auto_scale;
 
@@ -118,12 +118,11 @@ static inline unsigned ticks_to_position(int is_up, uint16_t ticks, unsigned adc
         uint16_t * unsafe up = adc_pot_state.lut_up;
         uint16_t * unsafe down = adc_pot_state.lut_down;
         unsigned num_points = adc_pot_state.lut_size;
-        unsigned port_time_offset = adc_pot_state.port_time_offset;
+        unsigned port_time_offset = adc_pot_state.adc_config.port_time_offset;
         qadc_q3_13_fixed_t max_scale_up = adc_pot_state.max_scale_up[adc_idx];
         qadc_q3_13_fixed_t max_scale_down = adc_pot_state.max_scale_down[adc_idx];
 
         unsigned max_arg = 0;
-
         // Remove fixed proc time overhead (nulls end positions)
         if(ticks > port_time_offset){
             ticks -= port_time_offset;
@@ -321,10 +320,10 @@ static void do_adc_convert(unsigned adc_idx, qadc_pot_state_t &adc_pot_state, po
         }
 
         // Check for minimum setting being smaller than port time offset (sets zero and full scale). Minimum time to trigger port select. 
-        if(conversion_time < adc_pot_state.port_time_offset){
-            dprintf("Port offset: %lu %lu\n", conversion_time, adc_pot_state.port_time_offset);
+        if(conversion_time < adc_pot_state.adc_config.port_time_offset){
+            dprintf("Port offset: %lu %lu\n", conversion_time, adc_pot_state.adc_config.port_time_offset);
             if(adc_pot_state.adc_config.auto_scale){
-                adc_pot_state.port_time_offset = conversion_time;
+                adc_pot_state.adc_config.port_time_offset = conversion_time;
             }
         }
 

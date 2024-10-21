@@ -34,11 +34,18 @@ typedef struct qadc_config_t{
     float v_thresh;
     /** The full conversion cycle time per channel (adc_xxx_task() only). The task will assert
      *  at initialisation if this is too short. */
+    char auto_scale;
+    /** Timing offset for the zero setting (rheostat) or end settings (potentiometer). 
+     *  This accounts for the minimum time measured by the QADC when the capacitor is already at
+     *  the expected value but the code takes a finite time to measure this.
+     * 
+     */
     unsigned convert_interval_ticks;
     /** Boolean setting which allows the end points of the QADC to be stretched if the read value
      *  exceeds the expected value. The new end point will be kept until the task is re-started. 
      *  This is ignored in single shot mode. */ 
-    char auto_scale;
+
+    uint16_t port_time_offset;
 }qadc_config_t;
 
 /**
