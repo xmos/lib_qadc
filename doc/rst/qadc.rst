@@ -99,6 +99,8 @@ The rheostat reader offers excellent linearity however it suffers from full scal
 
    QADC Rheostat Timer Ticks vs Position
 
+.. note::
+    If the QADC input pin is left disconnected you will see a full scale output.
 
 Potential Reader
 ................
@@ -152,6 +154,9 @@ A small amount of noise is present when taking readings close to the threshold p
 
    QADC Potentiometer Equivalent Circuit
 
+
+.. note::
+    If the QADC input pin is left disconnected you will likely see a value of 35 % of full scale for the 1b port version and a value of close to zero for the wide port version.
 
 
 Post Processing
@@ -367,7 +372,6 @@ A ``single shot`` API is also available which allows a single conversion to be p
 When infrequent conversions are made using ``single shot`` mode it is recommended to reduce the depth of the moving average filter down to the actual number conversions performed for each desired QADC value.
 
 The examples included in this repo under ``/examples`` show the single shot mode in use.
-
 
 
 
