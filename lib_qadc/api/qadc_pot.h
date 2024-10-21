@@ -10,6 +10,7 @@
  */
 typedef struct qadc_pot_state_t{
     size_t num_adc;
+    unsigned port_width;
     unsigned adc_idx;
     size_t lut_size;
     size_t filter_depth;
@@ -25,7 +26,6 @@ typedef struct qadc_pot_state_t{
     qadc_q3_13_fixed_t * UNSAFE max_scale_up;
     qadc_q3_13_fixed_t * UNSAFE max_scale_down;
     unsigned crossover_idx;
-    uint32_t port_time_offset;
     uint16_t * UNSAFE conversion_history;
     uint16_t * UNSAFE hysteris_tracker;
     uint16_t * UNSAFE init_port_val;

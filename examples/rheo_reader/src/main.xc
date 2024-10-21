@@ -88,14 +88,16 @@ int main() {
             const char auto_scale = 0;
 
             const unsigned convert_interval_ticks = (1 * XS1_TIMER_KHZ);
-            
+            const uint16_t port_time_offset = 32;      // 32 for 120MHz thread speed. Use 52 for 75MHz thread speed
+
             const qadc_config_t adc_config = {capacitor_pf,
                                                 potentiometer_ohms,
                                                 resistor_series_ohms,
                                                 v_rail,
                                                 v_thresh,
+                                                auto_scale,
                                                 convert_interval_ticks,
-                                                auto_scale};
+                                                port_time_offset};
 
             qadc_rheo_state_t adc_rheo_state;
             uint16_t state_buffer[QADC_RHEO_STATE_SIZE(NUM_ADC, FILTER_DEPTH)];

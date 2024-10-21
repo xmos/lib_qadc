@@ -33,10 +33,19 @@ void qadc_pot_init( port p_adc[],
         memset(state_buffer, 0, QADC_POT_STATE_SIZE(num_adc, lut_size, filter_depth) * sizeof(uint16_t));
 
         adc_pot_state.num_adc = num_adc;
+        adc_pot_state.port_width = (unsigned)p_adc[0] >> 16; // Width is 3rd byte
         adc_pot_state.lut_size = lut_size;
         adc_pot_state.filter_depth = filter_depth;
         adc_pot_state.result_hysteresis = result_hysteresis;
-        adc_pot_state.port_time_offset = 32; // Tested at 120MHz thread speed
+
+        // Check all ports the same width
+        unsigned num_ports = (adc_pot_state.num_adc + adc_pot_state.port_width - 1) / adc_pot_state.port_width;
+        unsigned total_port_width = 0;
+        for(int i = 0; i < num_ports; i++){
+            total_port_width += (unsigned)p_adc[i] >> 16;
+        }
+        assert(total_port_width == adc_pot_state.port_width * num_ports); // Ensure all ports the same type/width
+
 
         // Copy config to state
         adc_pot_state.adc_config.capacitor_pf = adc_config.capacitor_pf;
@@ -44,6 +53,7 @@ void qadc_pot_init( port p_adc[],
         adc_pot_state.adc_config.resistor_series_ohms = adc_config.resistor_series_ohms;
         adc_pot_state.adc_config.v_rail = adc_config.v_rail;
         adc_pot_state.adc_config.v_thresh = adc_config.v_thresh;
+        adc_pot_state.adc_config.port_time_offset = adc_config.port_time_offset;
         adc_pot_state.adc_config.convert_interval_ticks = adc_config.convert_interval_ticks;
         adc_pot_state.adc_config.auto_scale = adc_config.auto_scale;
 
@@ -92,9 +102,8 @@ void qadc_pot_init( port p_adc[],
 
         // Set all ports to input and set drive strength to low to reduce switching noise
         const int port_drive = DRIVE_2MA;
-        for(int i = 0; i < adc_pot_state.num_adc; i++){
-            unsigned dummy;
-            p_adc[i] :> dummy;
+        for(int i = 0; i < num_ports; i++){
+            p_adc[i] :> int _; // Hi-z
             // Simulator doesn't like setc so only do for hardware. isSimulation() takes 100ms or so per port so do here.
             if(!isSimulation()) set_pad_properties(p_adc[i], port_drive, PULL_NONE, 1, 0);
         }
@@ -109,12 +118,11 @@ static inline unsigned ticks_to_position(int is_up, uint16_t ticks, unsigned adc
         uint16_t * unsafe up = adc_pot_state.lut_up;
         uint16_t * unsafe down = adc_pot_state.lut_down;
         unsigned num_points = adc_pot_state.lut_size;
-        unsigned port_time_offset = adc_pot_state.port_time_offset;
+        unsigned port_time_offset = adc_pot_state.adc_config.port_time_offset;
         qadc_q3_13_fixed_t max_scale_up = adc_pot_state.max_scale_up[adc_idx];
         qadc_q3_13_fixed_t max_scale_down = adc_pot_state.max_scale_down[adc_idx];
 
         unsigned max_arg = 0;
-
         // Remove fixed proc time overhead (nulls end positions)
         if(ticks > port_time_offset){
             ticks -= port_time_offset;
@@ -216,7 +224,7 @@ typedef struct pot_timings_t{
 }pot_timings_t;
 
 
-static void do_adc_timing_init(port p_adc[], qadc_pot_state_t &adc_pot_state, pot_timings_t &pot_timings){
+static void do_adc_timing_init(qadc_pot_state_t &adc_pot_state, pot_timings_t &pot_timings){
     // Work out timing limits
     const unsigned capacitor_pf = adc_pot_state.adc_config.capacitor_pf;
     const unsigned potentiometer_ohms = adc_pot_state.adc_config.potentiometer_ohms;
@@ -235,12 +243,32 @@ static void do_adc_timing_init(port p_adc[], qadc_pot_state_t &adc_pot_state, po
 
 static void do_adc_charge(port p_adc[], unsigned adc_idx, qadc_pot_state_t &adc_pot_state, pot_timings_t &pot_timings){
     unsafe{
-        p_adc[adc_idx] :> adc_pot_state.init_port_val[adc_idx];
-        unsigned is_up = adc_pot_state.init_port_val[adc_idx];
-
         pot_timings.time_trigger_start_convert = pot_timings.time_trigger_charge + pot_timings.max_charge_period_ticks;
 
-        p_adc[adc_idx] <: is_up ^ 0x1; // Drive opposite to what we read to "charge"
+        unsigned is_up = 0;
+        if(adc_pot_state.port_width == 1){
+            p_adc[adc_idx] :> adc_pot_state.init_port_val[adc_idx];
+            is_up = adc_pot_state.init_port_val[adc_idx];
+            p_adc[adc_idx] <: is_up ^ 0x1; // Drive opposite to what we read to "charge"
+        } else {
+            unsigned bit_idx = adc_idx % adc_pot_state.port_width;
+            unsigned port_idx = adc_idx / adc_pot_state.port_width;
+            int tmp_port = 0;
+            p_adc[port_idx] :> tmp_port;
+            adc_pot_state.init_port_val[adc_idx] = (tmp_port >> bit_idx) & 0x01;
+            is_up = adc_pot_state.init_port_val[adc_idx];
+            if(is_up){
+                set_pad_drive_mode(p_adc[port_idx], DRIVE_LOW_WEAK_PULL_UP)
+                p_adc[port_idx] <: ~(0x01 << bit_idx);
+                // printhexln(~(0x01 << bit_idx));
+            } else {
+                set_pad_drive_mode(p_adc[port_idx], DRIVE_HIGH_WEAK_PULL_DOWN)
+                p_adc[port_idx] <: (0x01 << bit_idx);
+                // printhexln((0x01 << bit_idx));
+
+            }
+        }
+
         pot_timings.max_ticks_expected = is_up != 0 ? 
                             ((uint32_t)adc_pot_state.max_lut_ticks_up * (uint32_t)adc_pot_state.max_scale_up[adc_idx]) >> QADC_Q_3_13_SHIFT :
                             ((uint32_t)adc_pot_state.max_lut_ticks_down * (uint32_t)adc_pot_state.max_scale_down[adc_idx]) >> QADC_Q_3_13_SHIFT;
@@ -249,13 +277,14 @@ static void do_adc_charge(port p_adc[], unsigned adc_idx, qadc_pot_state_t &adc_
 }
 
 static void do_adc_start_convert(port p_adc[], unsigned adc_idx, qadc_pot_state_t &adc_pot_state, pot_timings_t &pot_timings){
-    p_adc[adc_idx] :> int _ @ pot_timings.start_time; // Make Hi Z and grab port time
+    unsigned port_idx = adc_idx / adc_pot_state.port_width;
+    p_adc[port_idx] :> int _ @ pot_timings.start_time;// Make Hi Z and grab port time
     // Set up an event to handle if port doesn't reach oppositie value. Set at double the max expected time. This is a fairly fatal 
     // event which is caused by severe mismatch of hardware vs init params
     pot_timings.time_trigger_overshoot = pot_timings.time_trigger_start_convert + (pot_timings.max_ticks_expected * 2);
 }
 
-static void do_adc_convert(port p_adc[], unsigned adc_idx, qadc_pot_state_t &adc_pot_state, pot_timings_t &pot_timings){
+static void do_adc_convert(unsigned adc_idx, qadc_pot_state_t &adc_pot_state, pot_timings_t &pot_timings){
     unsafe{
         int32_t conversion_time = (pot_timings.end_time - pot_timings.start_time);
         if(conversion_time < 0){
@@ -291,10 +320,10 @@ static void do_adc_convert(port p_adc[], unsigned adc_idx, qadc_pot_state_t &adc
         }
 
         // Check for minimum setting being smaller than port time offset (sets zero and full scale). Minimum time to trigger port select. 
-        if(conversion_time < adc_pot_state.port_time_offset){
-            dprintf("Port offset: %lu %lu\n", conversion_time, adc_pot_state.port_time_offset);
+        if(conversion_time < adc_pot_state.adc_config.port_time_offset){
+            dprintf("Port offset: %lu %lu\n", conversion_time, adc_pot_state.adc_config.port_time_offset);
             if(adc_pot_state.adc_config.auto_scale){
-                adc_pot_state.port_time_offset = conversion_time;
+                adc_pot_state.adc_config.port_time_offset = conversion_time;
             }
         }
 
@@ -317,17 +346,14 @@ static void do_adc_convert(port p_adc[], unsigned adc_idx, qadc_pot_state_t &adc
 }
 
 
-static void do_adc_handle_overshoot(port p_adc[], unsigned adc_idx, qadc_pot_state_t &adc_pot_state, pot_timings_t &pot_timings){
-    unsigned overshoot_port_val = 0;
-    p_adc[adc_idx] :> overshoot_port_val; // For debug only.
-
+static void do_adc_handle_overshoot(unsigned adc_idx, qadc_pot_state_t &adc_pot_state, pot_timings_t &pot_timings){
     unsafe{
         unsigned is_up = adc_pot_state.init_port_val[adc_idx];
         uint16_t result = adc_pot_state.crossover_idx + (is_up != 0 ? 1 : 0);
         uint16_t post_proc_result = post_process_result(result, adc_idx, adc_pot_state);
         adc_pot_state.results[adc_idx] = post_proc_result;
 
-        dprintf("result: %u ch: %u overshoot (ticks>%d) val:%u\n", post_proc_result, adc_idx, pot_timings.time_trigger_overshoot-pot_timings.time_trigger_start_convert, overshoot_port_val);
+        dprintf("result: %u ch: %u overshoot (ticks>%d)\n", post_proc_result, adc_idx, pot_timings.time_trigger_overshoot-pot_timings.time_trigger_start_convert);
     }
 
     pot_timings.time_trigger_charge += adc_pot_state.adc_config.convert_interval_ticks;
@@ -355,7 +381,7 @@ void qadc_pot_task(chanend ?c_adc, port p_adc[], qadc_pot_state_t &adc_pot_state
     // Timing struct
     pot_timings_t pot_timings = {0};
 
-    do_adc_timing_init(p_adc, adc_pot_state, pot_timings);
+    do_adc_timing_init(adc_pot_state, pot_timings);
 
     // Setup initial state
     adc_state_t adc_state = ADC_IDLE;
@@ -363,8 +389,11 @@ void qadc_pot_task(chanend ?c_adc, port p_adc[], qadc_pot_state_t &adc_pot_state
     // Set init time for charge
     tmr_charge :> pot_timings.time_trigger_charge;
     pot_timings.time_trigger_charge += pot_timings.max_charge_period_ticks; // start in one charge period
+
+    unsigned post_charge_port_val = 0;
     
     while(1) unsafe{
+        unsigned port_idx = adc_idx / adc_pot_state.port_width;
         select{
             case adc_state == ADC_IDLE => tmr_charge when timerafter(pot_timings.time_trigger_charge) :> int _:
                 do_adc_charge(p_adc, adc_idx, adc_pot_state, pot_timings);
@@ -372,12 +401,30 @@ void qadc_pot_task(chanend ?c_adc, port p_adc[], qadc_pot_state_t &adc_pot_state
             break;
 
             case adc_state == ADC_CHARGING => tmr_discharge when timerafter(pot_timings.time_trigger_start_convert) :> int _:
-                do_adc_start_convert(p_adc, adc_idx, adc_pot_state, pot_timings);
+                p_adc[port_idx] :> post_charge_port_val; // Grab charged port val for wide version
+                if(adc_pot_state.port_width == 1){
+                    post_charge_port_val = !adc_pot_state.init_port_val[adc_idx];
+                } else {
+                    post_charge_port_val = ~post_charge_port_val; // Trigger immediately so we catch the end cases
+                }
                 adc_state = ADC_CONVERTING;
+                do_adc_start_convert(p_adc, adc_idx, adc_pot_state, pot_timings);
             break;
 
-            case adc_state == ADC_CONVERTING => p_adc[adc_idx] when pinseq(adc_pot_state.init_port_val[adc_idx]) :> int _ @ pot_timings.end_time:
-                do_adc_convert(p_adc, adc_idx, adc_pot_state, pot_timings);
+            case (adc_state == ADC_CONVERTING) => p_adc[port_idx] when pinsneq(post_charge_port_val) :> int port_val @ pot_timings.end_time:
+                if(adc_pot_state.port_width == 1){
+                    do_adc_convert(adc_idx, adc_pot_state, pot_timings);
+                } else {
+                    // Work out if the pin of interest has changed
+                    unsigned bit_idx = adc_idx % adc_pot_state.port_width;
+                    unsigned bit_val = (port_val >> bit_idx) & 0x01;
+                    if(bit_val != adc_pot_state.init_port_val[adc_idx]){
+                        post_charge_port_val = port_val;
+                        break; // Keep firing select until desired bit transiton found
+                    } else {
+                        do_adc_convert(adc_idx, adc_pot_state, pot_timings);
+                    }
+                }
                 
                 // Cycle through the ADC channels
                 if(++adc_idx == adc_pot_state.num_adc){
@@ -388,8 +435,7 @@ void qadc_pot_task(chanend ?c_adc, port p_adc[], qadc_pot_state_t &adc_pot_state
 
             // This case happens if the hardware RC constant is much higher than expected
             case adc_state == ADC_CONVERTING => tmr_overshoot when timerafter(pot_timings.time_trigger_overshoot) :> int _:
-                do_adc_handle_overshoot(p_adc, adc_idx, adc_pot_state, pot_timings);
-                
+                do_adc_handle_overshoot(adc_idx, adc_pot_state, pot_timings);
                 // Cycle through the ADC channels
                 if(++adc_idx == adc_pot_state.num_adc){
                     adc_idx = 0;
@@ -409,7 +455,8 @@ void qadc_pot_task(chanend ?c_adc, port p_adc[], qadc_pot_state_t &adc_pot_state
                         c_adc <: (uint32_t)adc_pot_state.init_port_val[ch];
                     break;
                     case QADC_CMD_STOP_CONV:
-                        for(int i = 0; i < adc_pot_state.num_adc; i++){
+                        unsigned num_ports = (adc_pot_state.num_adc + adc_pot_state.port_width - 1) / adc_pot_state.port_width;
+                        for(int i = 0; i < num_ports; i++){
                             p_adc[i] :> int _;
                         }
                         adc_state = ADC_STOPPED;
@@ -438,23 +485,53 @@ uint16_t qadc_pot_single(port p_adc[], unsigned adc_idx, qadc_pot_state_t &adc_p
     int16_t result = 0;
 
     timer tmr_single;
-
+    unsigned port_idx = adc_idx / adc_pot_state.port_width;
     pot_timings_t pot_timings = {0};
-    do_adc_timing_init(p_adc, adc_pot_state, pot_timings);
+
+    do_adc_timing_init(adc_pot_state, pot_timings);
     tmr_single :> pot_timings.time_trigger_charge; // Set origin time. This is the datum for the following events.
     do_adc_charge(p_adc, adc_idx, adc_pot_state, pot_timings); // Start charging
     tmr_single when timerafter(pot_timings.time_trigger_start_convert) :> int _; // Wait until fully charged
+    
+    unsigned post_charge_port_val = 0;
+    p_adc[port_idx] :> post_charge_port_val; // Grab charged port val for wide version
+    if(adc_pot_state.port_width == 1){
+        unsafe{post_charge_port_val = !adc_pot_state.init_port_val[adc_idx];}
+    } else {
+        post_charge_port_val = ~post_charge_port_val; // Trigger immediately so we catch the end cases
+    }
+
     do_adc_start_convert(p_adc, adc_idx, adc_pot_state, pot_timings);
 
+
     // Now wait for conversion or overshoot timeout event
+    int conversion_ongoing = 1; // With mutli-bit we need to keep slecting until the known pin transition
     unsafe{
-        select{
-            case p_adc[adc_idx] when pinseq(adc_pot_state.init_port_val[adc_idx]) :> int _ @ pot_timings.end_time:
-                do_adc_convert(p_adc, adc_idx, adc_pot_state, pot_timings);
-            break;
-            case tmr_single when timerafter(pot_timings.time_trigger_overshoot) :> int _:
-                do_adc_handle_overshoot(p_adc, adc_idx, adc_pot_state, pot_timings);
-            break;
+        while(conversion_ongoing){
+            select{
+                case p_adc[port_idx] when pinsneq(post_charge_port_val) :> int port_val @ pot_timings.end_time:
+                    if(adc_pot_state.port_width == 1){
+                        do_adc_convert(adc_idx, adc_pot_state, pot_timings);
+                        conversion_ongoing = 0;
+                    } else {
+                        // Work out if the pin of interest has changed
+                        unsigned bit_idx = adc_idx % adc_pot_state.port_width;
+                        unsigned bit_val = (port_val >> bit_idx) & 0x01;
+                        if(bit_val != adc_pot_state.init_port_val[adc_idx]){
+                            post_charge_port_val = port_val;
+                            break; // Keep firing select until desired bit transiton found
+                        } else {
+                            do_adc_convert(adc_idx, adc_pot_state, pot_timings);
+                            conversion_ongoing = 0;
+                        }
+                    }
+                break;
+
+                case tmr_single when timerafter(pot_timings.time_trigger_overshoot) :> int _:
+                    do_adc_handle_overshoot(adc_idx, adc_pot_state, pot_timings);
+                    conversion_ongoing = 0;
+                break;
+            }
         }
         result = adc_pot_state.results[adc_idx];
     }

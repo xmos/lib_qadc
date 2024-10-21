@@ -44,7 +44,6 @@ void qadc_rheo_init( port p_adc[],
         adc_rheo_state.filter_depth = filter_depth;
         adc_rheo_state.adc_steps = adc_steps;
         adc_rheo_state.result_hysteresis = result_hysteresis;
-        adc_rheo_state.port_time_offset = 32; // Tested at 120MHz thread speed
 
         // Copy config
         adc_rheo_state.adc_config.capacitor_pf = adc_config.capacitor_pf;
@@ -53,6 +52,7 @@ void qadc_rheo_init( port p_adc[],
         adc_rheo_state.adc_config.v_rail = adc_config.v_rail;
         adc_rheo_state.adc_config.v_thresh = adc_config.v_thresh;
         adc_rheo_state.adc_config.convert_interval_ticks = adc_config.convert_interval_ticks;
+        adc_rheo_state.adc_config.port_time_offset = adc_config.port_time_offset;
         adc_rheo_state.adc_config.auto_scale = adc_config.auto_scale;
 
         // Grab vars and scale
@@ -121,7 +121,7 @@ static inline uint16_t post_process_result( uint16_t raw_result, unsigned adc_id
         unsigned result_hysteresis = adc_rheo_state.result_hysteresis;
         uint16_t *unsafe filter_write_idx = adc_rheo_state.filter_write_idx;
         uint16_t max_discharge_period_ticks = adc_rheo_state.max_disch_ticks;
-        uint16_t *zero_offset_ticks = &adc_rheo_state.port_time_offset;
+        uint16_t *zero_offset_ticks = &adc_rheo_state.adc_config.port_time_offset;
         uint16_t * unsafe max_scale = adc_rheo_state.max_scale;
         uint16_t * unsafe max_seen_ticks = adc_rheo_state.max_seen_ticks;
 
@@ -150,7 +150,7 @@ static inline uint16_t post_process_result( uint16_t raw_result, unsigned adc_id
         }
 
         // Track maximums
-        if(zero_offsetted_ticks > max_seen_ticks[adc_idx]){
+        if(adc_rheo_state.adc_config.auto_scale && (zero_offsetted_ticks > max_seen_ticks[adc_idx])){
             max_seen_ticks[adc_idx] = zero_offsetted_ticks;
             // Scale here if using calib
             // max_scale[adc_idx] = max_seen_ticks[adc_idx] << QADC_Q_3_13_SHIFT / max_discharge_period_ticks or something

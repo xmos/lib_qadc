@@ -12,12 +12,13 @@
 #define FILTER_DEPTH        16
 #define HYSTERESIS          1
 
-on tile[1]: port p_adc[] = {XS1_PORT_1M, XS1_PORT_1O}; // Sets which pins are to be used (channels 0..n) X1D36/38
+// Select your port as required. Either 1b or wide ports may be used.
+// on tile[1]: port p_adc[] = {XS1_PORT_1M, XS1_PORT_1O}; // Sets which pins are to be used (channels 0..n) X1D36/38
+on tile[1]: port p_adc[] = {XS1_PORT_4A}; // Sets which pins are to be used (channels 0..n) X1D02/03
 
 
 void control_task(chanend ?c_adc, uint16_t * unsafe result_ptr){
     printf("Running QADC in continuous mode using dedicated task!\n");
-
     unsigned counter = 0;
 
     while(1){
@@ -91,17 +92,20 @@ int main() {
 
             const float v_rail = 3.3;
             const float v_thresh = 1.15;
-            const char auto_scale = 1;
+            const char auto_scale = 0;
 
+            const uint16_t port_time_offset = 36;      // 36 for 120MHz thread speed. Use 56 for 75MHz thread speed
             const unsigned convert_interval_ticks = (1 * XS1_TIMER_KHZ); // 1 millisecond
             
-            const qadc_config_t adc_config = {capacitor_pf,
+            const qadc_config_t adc_config = {  capacitor_pf,
                                                 potentiometer_ohms,
                                                 resistor_series_ohms,
                                                 v_rail,
                                                 v_thresh,
+                                                auto_scale,
                                                 convert_interval_ticks,
-                                                auto_scale};
+                                                port_time_offset};
+                                                
             qadc_pot_state_t adc_pot_state;
 
             uint16_t state_buffer[QADC_POT_STATE_SIZE(NUM_ADC, LUT_SIZE, FILTER_DEPTH)];

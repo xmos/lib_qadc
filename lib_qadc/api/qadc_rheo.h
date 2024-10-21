@@ -20,7 +20,6 @@ typedef struct qadc_rheo_state_t{
     uint16_t * UNSAFE max_seen_ticks;
     qadc_q3_13_fixed_t * UNSAFE max_scale;
     unsigned crossover_idx;
-    uint16_t port_time_offset;
     uint16_t * UNSAFE conversion_history;
     uint16_t * UNSAFE hysteris_tracker;
     uint16_t * UNSAFE filter_write_idx;
