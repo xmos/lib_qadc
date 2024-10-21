@@ -376,8 +376,10 @@ uint16_t qadc_rheo_single(port p_adc[], unsigned adc_idx, qadc_rheo_state_t &adc
         result = adc_rheo_state.results[adc_idx];
     }
 
-    //DELAY
-    
+    // The pot value has only just reached the threshold so allow some time for it to nearly reach the pot value
+    // before next conversion in case it is back to back.
+    tmr_single when timerafter(rheo_timings.time_trigger_discharge + adc_rheo_state.max_disch_ticks) :> int _;
+     
     return result;
 }
 
