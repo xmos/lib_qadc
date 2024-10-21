@@ -281,7 +281,7 @@ The ``qadc_config_t`` configuration can be initialised (using C in this example 
 
 .. literalinclude:: ../../tests/qadc_c_interface/src/main.c
    :start-at: const qadc_config_t adc_config
-   :end-at: .port_time_offset =
+   :end-at: TBD
 
 
 
@@ -313,33 +313,6 @@ The ``max_charge_period_ticks`` is nominally 5 times the RC constant and ``max_d
 
 In ``single shot`` mode the setting is ignore because the API takes the correct amount of time to account for all required steps.
 
-
-How to set port_time_offset
-...........................
-
-The time it takes the QADC code to respond is finite. So when, for example, the rheostat is set to minimum or the potentiometer is set to minimum or maximum, the IO event indicating end of conversion should fire immediately. Due to the measured time being finite (but small) due to the number of CPU cycles needed to register the port event, an offset is required. This value is in 10 nanosecond timer ticks. 
-
-If this number is too small, it will result in full scale not being achived. If it is too large, then there will exist larger dead zones at full scale (and zero scale for the potentiometer). Hence it is recommended to evaluate this setting before deployment.
-
-The value needed will be proportional to the thread speed in your system which is typically ``core frequency / 5`` maximum and minimum ``core frequency / n`` where n is the maximum number of threads used on the QADC xcore tile. 
-
-If the thread speed is variable then it is recommended to tune this for the *slowest* thread speed and accecpt a small dead-spot. This ensures full scale is always acheivable.
-
-
-
-.. list-table:: Recommended ``port_time_offset`` values for QADC
-   :widths: 25 25 25
-   :header-rows: 1
-
-   * - Thread speed
-     - 75 MHz
-     - 120 MHz
-   * - Rheostat setting
-     - XXX
-     - XXX
-   * - Potentiometer setting
-     - 56
-     - 36
 
 
 QADC Usage

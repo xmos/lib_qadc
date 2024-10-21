@@ -41,12 +41,6 @@ typedef struct qadc_config_t{
     /** The full conversion cycle time per channel (adc_xxx_task() only). The task will assert
      *  at initialisation if this is too short. This setting is ignored in single-shot mode.*/    
     unsigned convert_interval_ticks;
-    /** Timing offset for the zero setting (rheostat) or end settings (potentiometer). 
-     *  This accounts for the minimum time measured by the QADC when the capacitor is already at
-     *  the expected value but the code takes a finite time to measure this. Please see documentation
-     *  for recommended settings.
-     */
-    uint16_t port_time_offset;
 }qadc_config_t;
 
 /**

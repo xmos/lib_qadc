@@ -52,7 +52,6 @@ void qadc_rheo_init( port p_adc[],
         adc_rheo_state.adc_config.v_rail = adc_config.v_rail;
         adc_rheo_state.adc_config.v_thresh = adc_config.v_thresh;
         adc_rheo_state.adc_config.convert_interval_ticks = adc_config.convert_interval_ticks;
-        adc_rheo_state.adc_config.port_time_offset = adc_config.port_time_offset;
         adc_rheo_state.adc_config.auto_scale = adc_config.auto_scale;
 
         // Grab vars and scale
@@ -121,7 +120,6 @@ static inline uint16_t post_process_result( uint16_t raw_result, unsigned adc_id
         unsigned result_hysteresis = adc_rheo_state.result_hysteresis;
         uint16_t *unsafe filter_write_idx = adc_rheo_state.filter_write_idx;
         uint16_t max_discharge_period_ticks = adc_rheo_state.max_disch_ticks;
-        uint16_t *zero_offset_ticks = &adc_rheo_state.adc_config.port_time_offset;
         uint16_t * unsafe max_scale = adc_rheo_state.max_scale;
         uint16_t * unsafe max_seen_ticks = adc_rheo_state.max_seen_ticks;
 
@@ -142,16 +140,9 @@ static inline uint16_t post_process_result( uint16_t raw_result, unsigned adc_id
         }
         uint16_t filtered_elapsed_time = accum / result_history_depth;
 
-        // Remove zero offset and clip negative
-        int zero_offsetted_ticks = filtered_elapsed_time - *zero_offset_ticks;
-        if(zero_offsetted_ticks < 0){
-            // *zero_offset_ticks += (zero_offsetted_ticks / 2); // Move zero offset halfway to compensate gradually
-            zero_offsetted_ticks = 0;
-        }
-
         // Track maximums
-        if(adc_rheo_state.adc_config.auto_scale && (zero_offsetted_ticks > max_seen_ticks[adc_idx])){
-            max_seen_ticks[adc_idx] = zero_offsetted_ticks;
+        if(adc_rheo_state.adc_config.auto_scale && (filtered_elapsed_time > max_seen_ticks[adc_idx])){
+            max_seen_ticks[adc_idx] = filtered_elapsed_time;
             // Scale here if using calib
             // max_scale[adc_idx] = max_seen_ticks[adc_idx] << QADC_Q_3_13_SHIFT / max_discharge_period_ticks or something
         }
@@ -161,13 +152,13 @@ static inline uint16_t post_process_result( uint16_t raw_result, unsigned adc_id
         // ticks = ((int64_t)max_scale_up * (int64_t)ticks) >> QADC_Q_3_13_SHIFT;
 
         // Clip positive
-        if(zero_offsetted_ticks > max_discharge_period_ticks){
-            zero_offsetted_ticks = max_discharge_period_ticks;
+        if(filtered_elapsed_time > max_discharge_period_ticks){
+            filtered_elapsed_time = max_discharge_period_ticks;
         }
 
         // Calculate scaled output
         uint16_t scaled_result = 0;
-        scaled_result = ((adc_steps - 1) * zero_offsetted_ticks) / max_discharge_period_ticks;
+        scaled_result = ((adc_steps - 1) * filtered_elapsed_time) / max_discharge_period_ticks;
 
         // Apply hysteresis
         if(scaled_result > hysteris_tracker[adc_idx] + result_hysteresis || scaled_result == (adc_steps - 1)){
@@ -218,10 +209,13 @@ static void do_adc_charge(port p_adc[], unsigned adc_idx, qadc_rheo_state_t &adc
 }
 
 
-static void do_adc_start_convert(port p_adc[], unsigned adc_idx, qadc_rheo_state_t &adc_rheo_state, rheo_timings_t &rheo_timings){
-    p_adc[adc_idx] :> int _ @ rheo_timings.start_time; // Make Hi Z and grab time
+static unsigned do_adc_start_convert(port p_adc[], unsigned adc_idx, qadc_rheo_state_t &adc_rheo_state, rheo_timings_t &rheo_timings){
+    unsigned post_charge_port_val = 0;
+    p_adc[adc_idx] :> int post_charge_port_val @ rheo_timings.start_time; // Make Hi Z and grab time
     // Setup overshoot event
     rheo_timings.time_trigger_overshoot = rheo_timings.time_trigger_discharge + adc_rheo_state.max_disch_ticks * 2;
+
+    return post_charge_port_val;
 }
 
 
@@ -283,6 +277,9 @@ void qadc_rheo_task(chanend ?c_adc, port p_adc[], qadc_rheo_state_t &adc_rheo_st
     tmr_charge :> rheo_timings.time_trigger_charge;
     rheo_timings.time_trigger_charge += rheo_timings.max_charge_period_ticks; // start in one charge period
 
+    // Used for determining the zero offset
+    unsigned post_charge_port_val = 0;
+
     while(1){
         select{
             case adc_state == ADC_IDLE => tmr_charge when timerafter(rheo_timings.time_trigger_charge) :> int _:
@@ -292,12 +289,15 @@ void qadc_rheo_task(chanend ?c_adc, port p_adc[], qadc_rheo_state_t &adc_rheo_st
             break;
 
             case adc_state == ADC_CHARGING => tmr_discharge when timerafter(rheo_timings.time_trigger_discharge) :> int _:
-                do_adc_start_convert(p_adc, adc_idx, adc_rheo_state, rheo_timings);
+                post_charge_port_val = do_adc_start_convert(p_adc, adc_idx, adc_rheo_state, rheo_timings);
 
                 adc_state = ADC_CONVERTING;
             break;
 
             case adc_state == ADC_CONVERTING => p_adc[adc_idx] when pinseq(0x0) :> int _ @ rheo_timings.end_time:
+                if(post_charge_port_val == 0){
+                    rheo_timings.end_time = rheo_timings.start_time; // End position
+                }
                 do_adc_convert(p_adc, adc_idx, adc_rheo_state, rheo_timings, adc_mode);
                 
                 // Cycle through the ADC channels
