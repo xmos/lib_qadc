@@ -365,7 +365,7 @@ The values may then be read by the application either:
    - Over a channel (application on same or different tile from the QADC) or 
    - By shared memory (same tile only) using the adc_xxx_state.results member which is a pointer to an array of ``unit16_t`` result values.
 
-The examples included in `this repo <https://github.com/xmos/lib_qadc>`_ under ``/examples`` show both continuous modes in use.
+The examples included in `the QADC repo <https://github.com/xmos/lib_qadc>`_ under ``/examples`` show both continuous modes in use.
 
 Single Shot Mode
 ................
@@ -374,7 +374,7 @@ A ``single shot`` API is also available which allows a single conversion to be p
 
 When infrequent conversions are made using ``single shot`` mode it is recommended to reduce the depth of the moving average filter down to the actual number conversions performed for each desired QADC value.
 
-The examples included in `this repo <https://github.com/xmos/lib_qadc>`_ under ``/examples`` show the single shot mode in use.
+The examples included in `the QADC repo <https://github.com/xmos/lib_qadc>`_ under ``/examples`` show the single shot mode in use.
 
 
 
@@ -501,7 +501,7 @@ Hardware Characterisation of QADC Potentiometer Transfer Curve
 
 A bench characterisation of the QADC potentiometer was conducted to verify the model. A 10 bit ADC was connected to the potentiometer and the voltage reading (reference voltage was logged). The QADC was configured to 10 bits then enabled and the estimated potentiometer setting was logged against the reference.
 
-In this case, less than ideal settings of 10 k for the potentiometer was used (causing a noticeable step at the end of the transfer curve) however the effect of 0 %, 20 % and -20 % deviation in the specified RC constant can be seen.
+In this case, less than ideal settings of 10 k for the potentiometer was used (causing a noticeable step at the end of the transfer curve) however the effect of 0 %, 20 % and -20 % deviation in the specified RC constant against the values used can be seen.
 
 .. figure:: images/calib_table_0.png
    :width: 80%
@@ -523,4 +523,4 @@ In this case, less than ideal settings of 10 k for the potentiometer was used (c
 
 It can be seen that, although the linearity is affected by +- 20% tolerance, the transfer curve remains monotonic and the end positions can always be reached. It also confirms that the model closely matches the practical operation of the QADC.
 
-The python model of the QADC may be found in the ``/design`` directory of `this repo <https://github.com/xmos/lib_qadc>`_ and is used in the regression test to ensure the embedded version matches.
+The python model of the QADC may be found in the ``/design`` directory of `the QADC repo <https://github.com/xmos/lib_qadc>`_ and is used in the regression test to ensure the embedded version matches.
