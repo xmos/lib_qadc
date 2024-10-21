@@ -28,7 +28,6 @@ const unsigned resistor_series_ohms = 220;
 const float v_rail = 3.3;
 const float v_thresh = 1.15;
 const char auto_scale = 0;
-const uint16_t zero_offset_ticks = 36;
 
 const unsigned convert_interval_ticks = (CONVERT_MS * XS1_TIMER_KHZ);
 
@@ -171,8 +170,7 @@ int main() {
                                                 v_rail,
                                                 v_thresh,
                                                 auto_scale,
-                                                convert_interval_ticks,
-                                                zero_offset_ticks};
+                                                convert_interval_ticks};
             qadc_pot_state_t adc_pot_state;
 
             uint16_t state_buffer[QADC_POT_STATE_SIZE(NUM_ADC, LUT_SIZE, FILTER_DEPTH)];
