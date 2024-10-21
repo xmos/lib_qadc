@@ -150,7 +150,7 @@ static inline uint16_t post_process_result( uint16_t raw_result, unsigned adc_id
         }
 
         // Track maximums
-        if(zero_offsetted_ticks > max_seen_ticks[adc_idx]){
+        if(adc_rheo_state.adc_config.auto_scale && (zero_offsetted_ticks > max_seen_ticks[adc_idx])){
             max_seen_ticks[adc_idx] = zero_offsetted_ticks;
             // Scale here if using calib
             // max_scale[adc_idx] = max_seen_ticks[adc_idx] << QADC_Q_3_13_SHIFT / max_discharge_period_ticks or something

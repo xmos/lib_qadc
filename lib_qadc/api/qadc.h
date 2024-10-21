@@ -32,19 +32,20 @@ typedef struct qadc_config_t{
     float v_rail;
     /** Voltage of the input threshold. This is nominally 1.15 volts for a 3.3 volt rail. */
     float v_thresh;
-    /** The full conversion cycle time per channel (adc_xxx_task() only). The task will assert
-     *  at initialisation if this is too short. */
+    /** Boolean setting which allows the largest time seen by the conversion to be trimmed if it
+     *  exceeds the expected value. The new end point will be kept until the task is re-started. 
+     *  It can account for cases where the RC delay constant is much larger than expected. 
+     *  Note no scheme is available for detecting the case where the RC constant is shorter 
+     *  than expected. */ 
     char auto_scale;
+    /** The full conversion cycle time per channel (adc_xxx_task() only). The task will assert
+     *  at initialisation if this is too short. This setting is ignored in single-shot mode.*/    
+    unsigned convert_interval_ticks;
     /** Timing offset for the zero setting (rheostat) or end settings (potentiometer). 
      *  This accounts for the minimum time measured by the QADC when the capacitor is already at
-     *  the expected value but the code takes a finite time to measure this.
-     * 
+     *  the expected value but the code takes a finite time to measure this. Please see documentation
+     *  for recommended settings.
      */
-    unsigned convert_interval_ticks;
-    /** Boolean setting which allows the end points of the QADC to be stretched if the read value
-     *  exceeds the expected value. The new end point will be kept until the task is re-started. 
-     *  This is ignored in single shot mode. */ 
-
     uint16_t port_time_offset;
 }qadc_config_t;
 

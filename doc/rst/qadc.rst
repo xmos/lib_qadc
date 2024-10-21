@@ -38,9 +38,12 @@ Two schemes are offered which have different pros and cons depending on the appl
      * - Typical minimum conversion time per channel
        - ~0.2 - 0.5 milliseconds
        - ~0.2 - 0.5 milliseconds
+     * - Supported port widths
+       - 1 bit ports only
+       - Any port width. Arrays or ports must be of same type.
      * - Number of channels
-       - Limited by 1 bit port count only
-       - Limited by 1 bit port count only
+       - Limited by port count only
+       - Limited by port count only
      * - Typical ENOBs post filtering 
        - 8+
        - 8+
@@ -68,13 +71,14 @@ Rheostat Reader
 
 The rheostat reader uses just two terminals of a potentiometer and treats it as variable resistor (rheostat). The scheme works as follows:
 
-- Charge capacitor via IO by driving a `one` and waiting for at least 5 maximum RC charge periods.
+- Charge capacitor via the port by driving a `one` and waiting for at least 5 maximum RC charge periods.
 - Make IO open circuit which initiates the discharge. Take the port timer at this point. Setup a `pinseq(0)` event on the port to capture the transition to zero.
 - Wait for transition to a read `zero` and take the stop timestamp.
 - Set the port to high impedance because there is no point in fully discharging the capacitor.
 - Calculate difference the difference in time.
 - Post process value to reduce noise and improve linearity.
 
+The rheostat reader currently supports only arrays of 1 bit ports.
 
 
 .. _fig_qadc_rheo_schem:
@@ -124,6 +128,8 @@ The scheme works as follows:
 - Take a timestamp when voltage crosses threshold.
 - Use the lookup table to calculate the start voltage.
 - Post process value to reduce noise and improve linearity.
+
+The rheostat reader currently supports arrays of any port width with the proviso that all ports are the same width.
 
 The potential reader offers good performance and is less susceptible to component tolerances due to the mathematics of using a parallel resistor network and the logarithm used. It will always achieve zero and full scale however if tolerances are too large then it may show worse non-linearity than the rheostat reader and, in particular, around the 35% setting point which corresponds the threshold voltage of the IO. It does however always remain monotonic in operation. The fact that a small amount of noise is present when taking readings close to the threshold point and a moving average filter is typically used, these non-linearities are reduced in practice and more than eight bits of resolution can easily be achieved.
 
@@ -215,10 +221,14 @@ The small steps in the transfer curve close to zero and full scale settings are 
 
 
 .. _fig_qadc_pot_tol:
+
 .. figure:: images/qadc_pot_tol.png
    :width: 80%
 
    QADC Potentiometer Effect of 20% Tolerance on Transfer Curve
+
+
+.. _passive_selection:
 
 Passive Component Selection
 ---------------------------
@@ -235,7 +245,7 @@ The series resistor value is a compromise. Ideally it would set to a low value t
 
 Typical values recommended are:
 
-.. list-table:: Recommended passive values of QADC
+.. list-table:: Recommended passive values for QADC
    :widths: 20 25 25 25
    :header-rows: 1
 
@@ -249,35 +259,101 @@ Typical values recommended are:
      - 1 millisecond (= 100,000 10 MHz timer ticks)
 
 
+.. _tuning:
+
+QADC Tuning
+-----------
+
+Once the :ref:`passive components have been selected <passive_selection>` then you can configure your QADC. Both schemes share a common configuration of type ``qadc_config_t`` as shown in the :ref:`API section <api>`.
+
+.. note::
+    It is highly recommended to prototype the values and test the configuration before deployment. There are natural sources of error in any analog scheme and these should be evaluated by the user.
+
+The ``qadc_config_t`` configuration can be initialised (using C in this example rather than XC) as follows:
+
+
+.. literalinclude:: ../../tests/qadc_c_interface/src/main.c
+   :start-at: const qadc_config_t adc_config
+   :end-at: .port_time_offset =
+
+
+
+The passive component selection should be directly inputted into the structure and nominal values of ``3.3`` and ``1.15`` used for the IO voltage and threshold voltage. If the IO voltage is known to be say 5 % lower than 3.3 then please scale both values accordingly (e.g. 3.135 and 1.0925).
+
+The final three settings require some thought and are described below.
+
+How to set auto_scale
+.....................
+
+Autoscale works by measuring the time taken to reach the conversion result. If it takes longer than expected (full scale for rheostat or 35% setting for potentiometer) then it trims the max value so that the reading can be made more accurate during the following runtime of the QADC (until reset).
+
+It can help cases where the RC constant is larger than expected however it is not possible to detect where the RC constant is smaller than expected. 
+It may be helpful to use this setting if you choose to set the RC a little higher than nominal to achieve better linearity. However it must be noted that the first full transition of QADC will behave slightly differently to subsequent transitions.
+
+
+How to set convert_interval_ticks
+.................................
+
+This parameter is only relevant to ``continuous`` mode where a task cycles through the QADCs. It sets the total period per conversion which includes charging the capacitor, measuring the discharge periods and an idle time at the end to allow the capacitor to reach it's natural voltage governed by the external passives.
+
+The QADC will check the set values and automatically assert if the following condition is not met::
+
+    convert_interval_ticks > (max_charge_period_ticks + max_disch_ticks * 2)
+
+The ``max_charge_period_ticks`` is nominally 5 times the RC constant and ``max_disch_ticks`` is calculated by the code as the maximum time to reach the threshold voltage when the IO goes high impedance. This is doubled to allow for some idle time and provides a safe setting. A typical setting will be in the region of one millisecond, depending on passive value selection.
+
+In ``single shot`` mode the setting is ignore because the API takes the correct amount of time to account for all required steps.
+
+
+How to set port_time_offset
+...........................
+
+The time it takes the QADC code to respond is finite. So when for example the rheostat is set to minimum or the potentiometer is set to minimum or maximum, the IO event indicating end of conversion will fire immediately. Due to the difference in the IO even being 0 but the measured time being finite, a small offset is required. This value is in 10 nanosecond timer ticks. 
+
+If this number is too small, it will result in full scale not being achived. If it is too large, then there will exist larger dead zones at full scale (and zero scale for the potentiometer). Hence it is recommended to evaluate this before deployment. The value needed will be proportional to the thread speed in your system which is typically ``core frequency / 5`` maximum and minimum ``core frequency / n`` where n is the maximum number of threads used on the QADC tile. 
+
+If the thread speed is variable then it is recommended to tune this for the *slowest* thread speed and accecpt a small dead-spot. This ensures full scale is always acheivable.
+
+
+
+.. list-table:: Recommended ``port_time_offset`` values for QADC
+   :widths: 25 25 25
+   :header-rows: 1
+
+   * - Thread speed
+     - 75 MHz
+     - 120 MHz
+   * - Rheostat setting
+     - XXX
+     - XXX
+   * - Potentiometer setting
+     - 56
+     - 36
+
+
 QADC Usage
 ----------
 
-There are three main modes of operation for the QADC. If many channels are needed and ``continuous`` updates are required then it is convenient to run a task which performs background continuous conversion and associated filtering. This requires a dedicated hardware thread. The values may then be read by the application either over a channel (application on same or different tile from the QADC) or by shared memory (same tile only).
+There are three main modes of operation for the QADC.
+
+Continuous Modes
+................
+
+If many channels are needed and ``continuous`` updates are required then it is convenient to run a task which performs background continuous conversion and associated filtering. This requires a dedicated hardware thread.
+
+The values may then be read by the application either over a channel (application on same or different tile from the QADC) or by shared memory (same tile only).
+
+Single Shot Mode
+................
 
 A ``single shot`` API is also available which allows a single conversion to be performed by calling a function. Note that the function call is blocking and will return only when the conversion is complete. This will typically take a few hundred microseconds for the recommended passive component selection.
 
 When infrequent conversions are made using ``single shot`` mode it is recommended to reduce the depth of the moving average filter down to the actual number conversions performed for each desired QADC value.
 
-.. list-table:: API options for QADC
-   :widths: 15 20 30 20
-   :header-rows: 1
 
-   * - 
-     - Continuous (Channel)
-     - Continuous (Shared memory)
-     - Single shot
-   * - Thread usage
-     - 1
-     - 1
-     - 0 (function call)
-   * - Tile placement
-     - Any
-     - App same as QADC
-     - App same as QADC
-   * - Conversion
-     - Continuous
-     - Continuous
-     - Single
+
+.. _api:
+
 
 QADC API
 --------
@@ -292,6 +368,7 @@ Common items for both types of QADC are shown here.
     extra hardware setup may be needed. If using PAR_JOBS() please call qadc_pre_init_c() before 
     QADC initialisation.
 
+See the :ref:`QADC Tuning <tuning>` section for more details on setting these values.
 
 .. doxygenstruct:: qadc_config_t
     :members:

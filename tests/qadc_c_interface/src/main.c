@@ -52,14 +52,15 @@ void qadc_pot_task_wrapper(chanend_t c_adc_pot, port_t *p_adc, qadc_config_t adc
 
 
 int main(void){
-    const qadc_config_t adc_config = {  2000,
-                                        47000,
-                                        470,
-                                        3.3,
-                                        1.15,
-                                        1,
-                                        1 * XS1_TIMER_KHZ,
-                                        36};
+    // Note this struct init is parsed in the rst docs
+    const qadc_config_t adc_config = {  .capacitor_pf = 2000,
+                                        .potentiometer_ohms = 47000,
+                                        .resistor_series_ohms = 470,
+                                        .v_rail = 3.3,
+                                        .v_thresh = 1.15,
+                                        .auto_scale = 0,
+                                        .convert_interval_ticks = 1 * XS1_TIMER_KHZ,
+                                        .port_time_offset = 36};
 
     channel_t c_adc_pot = chan_alloc();
     channel_t c_adc_rheo = chan_alloc();
