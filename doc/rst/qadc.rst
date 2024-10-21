@@ -226,7 +226,7 @@ The curve will always remain monotonic increasing however the effect of noise (p
 
 Where the potentiometer end to end resistance is higher than set in the model, flat spot effect will be seen due to a higher than expected RC constant when the potentiometer is near to the GPIO input threshold voltage. Where the potentiometer end to end resistance is lower than set in the model, the inflection effect will be see due to the RC time constant being shorter than expected. This can be seen in :ref:`the potentiometer transfer curve <fig_qadc_pot_tol>`.
 
-The small steps in the transfer curve close to zero and full scale settings are caused by the QADC not being able to charge the capacitor past the threshold voltage due to the potential divider effect of the series resistor and the potentiometer equivalent series resistance.
+The small steps in the transfer curve close to zero and full scale settings are caused by the QADC not being able to charge the capacitor past the threshold voltage due to the potential divider effect of the series resistor and the potentiometer equivalent series resistance. Increasing the potentiometer value and decreasing the series resistor can reduce this effect.
 
 .. note::
     Overall, it is recommended to use the `Potentiometer` approach in cases where the potentiometer tolerance is between 10% and 20% and including a manufacturing calibration step is not practical.
