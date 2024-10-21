@@ -269,7 +269,7 @@ Typical values recommended are:
      - Series resistor value
      - Conversion cycle time
    * - 2200 pF 5%
-     - 47 kOhms, 20 % or better (10 % ideally)
+     - 47 - 100 kOhms, 20 % or better (10 % ideally)
      - 470 Ohms, 5 % or better
      - 1 millisecond (= 100,000 10 MHz timer ticks)
 

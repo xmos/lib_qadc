@@ -202,3 +202,6 @@ class qadc_pot:
             ticks = self.down[idx]
 
         return ticks, start_high
+
+
+# See tests/test_qadc_model_tolerance.py for an example of using this model
