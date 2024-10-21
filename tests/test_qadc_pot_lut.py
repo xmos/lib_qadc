@@ -33,13 +33,13 @@ def pot_lut_compare(cap_pf, res_pot, res_ser, vrail, vthresh, num_adc, filter_de
 
     # Build test app
     cmd = 'cmake -G "Unix Makefiles" -B build'
-    subprocess.run(cmd, shell=True, cwd=str(file_dir/"qadc_lut_pot"))
+    assert not subprocess.run(cmd, shell=True, cwd=str(file_dir/"qadc_lut_pot")).returncode
     cmd = 'xmake -j'
-    subprocess.run(cmd, shell=True, cwd=str(file_dir/"qadc_lut_pot/build"))
+    assert not subprocess.run(cmd, shell=True, cwd=str(file_dir/"qadc_lut_pot/build")).returncode
 
     # Run test app
     cmd = f"xsim --args {firmware_xe} {cap_pf} {res_pot} {res_ser} {vrail} {vthresh}"
-    subprocess.run(cmd.split())
+    assert not subprocess.run(cmd.split()).returncode
 
     # Load output
     lut_dut = np.fromfile(lut_file, dtype=np.uint16)
