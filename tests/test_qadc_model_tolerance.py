@@ -45,9 +45,9 @@ def sim_sweep(model_cal, models_used, tolernace, num_points=1024):
 
 
 def qadc_rheo_test(tolerance_pc):
-    r_rheo_nom = 10000
-    cap_pf = 8800
-    r_series = 220
+    r_rheo_nom = 47000
+    cap_pf = 2200
+    r_series = 470
     v_rail = 3.3
     v_thresh = 1.14
 
@@ -58,9 +58,9 @@ def qadc_rheo_test(tolerance_pc):
 
 
 def qadc_pot_test(tolerance_pc):
-    r_pot_nom = 10000
-    cap_pf = 8800
-    r_series = 220
+    r_pot_nom = 47000
+    cap_pf = 2200
+    r_series = 470
     v_rail = 3.3
     v_thresh = 1.14
 

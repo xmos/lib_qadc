@@ -542,5 +542,10 @@ uint16_t qadc_pot_single(port p_adc[], unsigned adc_idx, qadc_pot_state_t &adc_p
         result = adc_pot_state.results[adc_idx];
     }
     
+    // The pot value has only just reached the threshold so allow some time for it to nearly reach the pot value
+    // before next conversion in case it is back to back.
+    tmr_single when timerafter(pot_timings.time_trigger_start_convert + pot_timings.max_ticks_expected) :> int _;
+
+
     return result;
 }

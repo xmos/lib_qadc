@@ -84,7 +84,7 @@ The rheostat reader currently supports only arrays of 1 bit ports.
 
 
 .. _fig_qadc_rheo_schem:
-.. figure:: images/qadc_rheo_schem.pdf
+.. figure:: images/qadc_rheo_schem.drawio.png
    :width: 80%
 
    QADC Rheostat Circuit
@@ -99,6 +99,8 @@ The rheostat reader offers excellent linearity however it suffers from full scal
 
    QADC Rheostat Timer Ticks vs Position
 
+.. note::
+    If the QADC input pin is left disconnected you will see a full scale output.
 
 Potential Reader
 ................
@@ -139,7 +141,7 @@ A small amount of noise is present when taking readings close to the threshold p
 
 
 .. _fig_qadc_pot_schem:
-.. figure:: images/qadc_pot_schem.pdf
+.. figure:: images/qadc_pot_schem.drawio.png
    :width: 80%
 
    QADC Potentiometer Circuit
@@ -147,11 +149,14 @@ A small amount of noise is present when taking readings close to the threshold p
 
 
 .. _fig_qadc_pot_equiv_schem:
-.. figure:: images/qadc_pot_equiv_schem.pdf
+.. figure:: images/qadc_pot_equiv_schem.drawio.png
    :width: 80%
 
    QADC Potentiometer Equivalent Circuit
 
+
+.. note::
+    If the QADC input pin is left disconnected you will likely see a value of 35 % of full scale for the 1b port version and a value of close to zero for the wide port version.
 
 
 Post Processing
@@ -161,7 +166,7 @@ Both QADC schemes benefit from post processing of the raw measured transition ti
 
 
 .. _fig_post_proc:
-.. figure:: images/qadc_post_proc.pdf
+.. figure:: images/qadc_post_proc.drawio.png
    :width: 80%
 
    QADC Post Processing Steps
@@ -209,13 +214,13 @@ If a manufacturing test is an option to calibrate the component values then this
    QADC Rheostat Effect of 20% Tolerance on Transfer Curve
 
 
-The `Potentiometer` approach is more tolerant to the overall end to end resistance since it's operation also relies on the starting potential as well as the equivalent series resistance at any given setting, which itself is a function of the end-end track resistance. Even when tolerance is 20% out the end positions will always achieve zero and full scale however linearity is slightly degraded and a small flat spot or inflection point may be seen at around 1/3 of the travel. 
+The `Potentiometer` approach is more tolerant to the overall end to end resistance since it's operation also relies on the starting potential as well as the equivalent series resistance at any given setting, which itself is a function of the end-to-end track resistance. Even when tolerance is 20% out the end positions will always achieve zero and full scale however linearity is slightly degraded and a small flat spot or inflection point may be seen at around 1/3 of the travel. 
 
 The curve will always remain monotonic increasing however the effect of noise (present in all ADCs) and the use of post processing (filtering and hysteresis)  reduces the real life affect to a couple of percent of the travel, to a point where it may be unnoticeable.
 
-Where the potentiometer end to end resistance is higher than set in the model, flat spot effect will be seen due to a higher than expected RC constant when the potentiometer is near to the GPIO input threshold voltage. Where the potentiometer end to end resistance is lower than set in the model, the inflection effect will be see due to the RC time constant being shorter than expected. This can be seen in :ref:`the potentiometer transfer curve <fig_qadc_rheo_tol>`.
+Where the potentiometer end to end resistance is higher than set in the model, flat spot effect will be seen due to a higher than expected RC constant when the potentiometer is near to the GPIO input threshold voltage. Where the potentiometer end to end resistance is lower than set in the model, the inflection effect will be see due to the RC time constant being shorter than expected. This can be seen in :ref:`the potentiometer transfer curve <fig_qadc_pot_tol>`.
 
-The small steps in the transfer curve close to zero and full scale settings are caused by the QADC not being able to charge the capacitor past the threshold voltage due to the potential divider effect of the series resistor and the potentiometer equivalent series resistance.
+The small steps in the transfer curve close to zero and full scale settings are caused by the QADC not being able to charge the capacitor past the threshold voltage due to the potential divider effect of the series resistor and the potentiometer equivalent series resistance. Increasing the potentiometer value and decreasing the series resistor can reduce this effect.
 
 .. note::
     Overall, it is recommended to use the `Potentiometer` approach in cases where the potentiometer tolerance is between 10% and 20% and including a manufacturing calibration step is not practical.
@@ -227,6 +232,9 @@ The small steps in the transfer curve close to zero and full scale settings are 
    :width: 80%
 
    QADC Potentiometer Effect of 20% Tolerance on Transfer Curve
+
+
+This theoretical behavior has been verified as shown in the :ref:`Hardware Characterisation <characterise>` section of this document.
 
 
 .. _passive_selection:
@@ -242,7 +250,7 @@ Choosing a value significantly of 100 kOhms or above may also decrease performan
 
 The capacitor value should by typically around 2 - 5 nF with the same trade-offs being seen as that of the variable resistor. A larger value is acceptable but it will increase the conversion time. A smaller value will increase noise and the effects of PCB stray capacitance may start to emerge. A 5 % tolerance C0G or similar capacitor is recommended although any type with good voltage vs. capacitance characteristics and 5 % tolerance is acceptable. Typical X7R decoupling capacitors are not ideal due to their negative voltage coefficient of capacitance which means the capacitance varies based on voltage.
 
-The series resistor value is a compromise. Ideally it would set to a low value to reduce the small step effects in the transfer curve however this increases the current draw on the IO pin when the slider is close to end settings, which is undesirable and may cause noise. Typically a value of 1% of the variable resistor value is applicable with a minimum being around 330 ohms to limit the inrush current to the capacitor. Smaller values may cause unwanted EMI when the IO pin charges the capacitor although the IO drive settings are set to the minimum of 2 mA in QADC to minimise this effect.
+The series resistor value is a compromise. Ideally it would set to a low value to reduce the small step effects in the transfer curve however this increases the current draw on the IO pin when the slider is close to end settings, which is undesirable and may cause noise. Typically a value of 1 % of the variable resistor value maximum is applicable with a minimum being around 330 ohms to limit the inrush current to the capacitor. Smaller values may cause unwanted EMI when the IO pin charges the capacitor although the IO drive settings are set to the minimum of 2 mA in QADC to minimise this effect.
 
 Typical values recommended are:
 
@@ -254,9 +262,9 @@ Typical values recommended are:
      - Potentiometer value
      - Series resistor value
      - Conversion cycle time
-   * - 2000 pF 5%
-     - 47 kOhms, 20% or better
-     - 470 Ohms, 5% or better
+   * - 2200 pF 5%
+     - 47 - 100 kOhms, 20 % or better (10 % ideally)
+     - 470 Ohms, 5 % or better
      - 1 millisecond (= 100,000 10 MHz timer ticks)
 
 
@@ -324,7 +332,7 @@ The values may then be read by the application either:
    - Over a channel (application on same or different tile from the QADC) or 
    - By shared memory (same tile only) using the adc_xxx_state.results member which is a pointer to an array of ``unit16_t`` result values.
 
-The examples included in this repo under ``/examples`` show both continuous modes in use.
+The examples included in `the QADC repo <https://github.com/xmos/lib_qadc>`_ under ``/examples`` show both continuous modes in use.
 
 Single Shot Mode
 ................
@@ -333,8 +341,7 @@ A ``single shot`` API is also available which allows a single conversion to be p
 
 When infrequent conversions are made using ``single shot`` mode it is recommended to reduce the depth of the moving average filter down to the actual number conversions performed for each desired QADC value.
 
-The examples included in this repo under ``/examples`` show the single shot mode in use.
-
+The examples included in `the QADC repo <https://github.com/xmos/lib_qadc>`_ under ``/examples`` show the single shot mode in use.
 
 
 
@@ -450,3 +457,37 @@ In each case the converted QADC values will be periodically printed to the conso
     Read channel ch 0: 251, ch 1: 610, 
     Read channel ch 0: 219, ch 1: 634, 
     ...
+
+
+
+.. _characterise:
+
+
+Hardware Characterisation of QADC Potentiometer Transfer Curve
+--------------------------------------------------------------
+
+A bench characterisation of the QADC potentiometer was conducted to verify the model. A 10 bit ADC was connected to the potentiometer and the voltage reading (reference voltage was logged). The QADC was configured to 10 bits then enabled and the estimated potentiometer setting was logged against the reference.
+
+In this case, less than ideal settings of 10 k for the potentiometer was used (causing a noticeable step at the end of the transfer curve) however the effect of 0 %, 20 % and -20 % deviation in the specified RC constant against the values used can be seen.
+
+.. figure:: images/calib_table_0.png
+   :width: 80%
+
+   QADC Potentiometer Transfer curve with 0 % Tolerance RC settings
+
+
+.. figure:: images/calib_table_-20.png
+   :width: 80%
+
+   QADC Potentiometer Transfer curve with -20 % Tolerance RC settings
+
+
+.. figure:: images/calib_table_20.png
+   :width: 80%
+
+   QADC Potentiometer Transfer curve with +20 % Tolerance RC settings
+
+
+It can be seen that, although the linearity is affected by +- 20% tolerance, the transfer curve remains monotonic and the end positions can always be reached. It also confirms that the model closely matches the practical operation of the QADC.
+
+The python model of the QADC may be found in the ``/design`` directory of `the QADC repo <https://github.com/xmos/lib_qadc>`_ and is used in the regression test to ensure the embedded version matches.
