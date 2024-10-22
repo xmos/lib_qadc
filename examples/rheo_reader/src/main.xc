@@ -17,8 +17,6 @@ on tile[1]: port p_adc[] = {XS1_PORT_1M, XS1_PORT_1O}; // Sets which pins are to
 void control_task(chanend ?c_adc, uint16_t * unsafe result_ptr){
     printf("Running QADC in continuous mode using dedicated task!\n");
 
-    unsigned counter = 0;
-
     while(1){
         uint32_t adc[NUM_ADC];
 
@@ -34,22 +32,9 @@ void control_task(chanend ?c_adc, uint16_t * unsafe result_ptr){
 
                 printf("ch %u: %u, ", ch, adc[ch]);
             }
-
         }
         putchar('\n');
         delay_milliseconds(100);
-
-        // If using channel comms pause so we can read pot voltage for testing
-        if(!isnull(c_adc)){
-            if(++counter == 10){
-                printf("Restarting ADC...\n");
-                c_adc <: (uint32_t)QADC_CMD_STOP_CONV;
-                delay_milliseconds(1000); // Time to read the actual pot voltage
-                c_adc <: (uint32_t)QADC_CMD_START_CONV;
-                counter = 0;
-                delay_milliseconds(100);
-            }
-        }
     }
 }
 
@@ -79,9 +64,9 @@ void qadc_rheo_single_example(port p_adc[], qadc_rheo_state_t &adc_rheo_state){
 int main() {
     par{
         on tile[1]:{
-            const unsigned capacitor_pf = 8800;        // Set the capacitor value here
-            const unsigned potentiometer_ohms = 10000; // Set the potenitiometer nominal maximum value (end to end)
-            const unsigned resistor_series_ohms = 220; // Set the series resistor value here
+            const unsigned capacitor_pf = 6800;        // Set the capacitor value here
+            const unsigned potentiometer_ohms = 10500; // Set the potenitiometer nominal maximum value (end to end)
+            const unsigned resistor_series_ohms = 340; // Set the series resistor value here
 
             const float v_rail = 3.3;
             const float v_thresh = 1.15;
