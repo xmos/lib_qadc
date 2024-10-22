@@ -296,8 +296,9 @@ How to set auto_scale
 
 Autoscale works by measuring the time taken to reach the conversion result. If it takes longer than expected (full scale for rheostat or 35% setting for potentiometer) then it trims the max value so that the reading can be made more accurate during the following runtime of the QADC (until reset).
 
-It can help cases where the RC constant is larger than expected however it is not possible to detect where the RC constant is smaller than expected. 
-It may be helpful to use this setting if you choose to set the RC a little higher than nominal to achieve better linearity. However it must be noted that the first full transition of QADC will behave slightly differently to subsequent transitions if this is enabled.
+It can help cases where the RC constant is larger than expected however it is not possible to detect where the RC constant is smaller than expected because this is indistiguishable from a normal lower setting.
+
+It may be helpful to use this setting if you choose to set the RC settings in the code a little lower than nominal to achieve better range. However it must be noted that the first full transition of QADC must complete before the new max is learnt and so will behave slightly differently to subsequent transitions.
 
 Set this value to 0 by default.
 
