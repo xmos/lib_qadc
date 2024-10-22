@@ -53,7 +53,6 @@ void qadc_pot_init( port p_adc[],
         adc_pot_state.adc_config.resistor_series_ohms = adc_config.resistor_series_ohms;
         adc_pot_state.adc_config.v_rail = adc_config.v_rail;
         adc_pot_state.adc_config.v_thresh = adc_config.v_thresh;
-        adc_pot_state.adc_config.port_time_offset = adc_config.port_time_offset;
         adc_pot_state.adc_config.convert_interval_ticks = adc_config.convert_interval_ticks;
         adc_pot_state.adc_config.auto_scale = adc_config.auto_scale;
 
@@ -118,17 +117,10 @@ static inline unsigned ticks_to_position(int is_up, uint16_t ticks, unsigned adc
         uint16_t * unsafe up = adc_pot_state.lut_up;
         uint16_t * unsafe down = adc_pot_state.lut_down;
         unsigned num_points = adc_pot_state.lut_size;
-        unsigned port_time_offset = adc_pot_state.adc_config.port_time_offset;
         qadc_q3_13_fixed_t max_scale_up = adc_pot_state.max_scale_up[adc_idx];
         qadc_q3_13_fixed_t max_scale_down = adc_pot_state.max_scale_down[adc_idx];
 
         unsigned max_arg = 0;
-        // Remove fixed proc time overhead (nulls end positions)
-        if(ticks > port_time_offset){
-            ticks -= port_time_offset;
-        } else{
-            ticks = 0;
-        }
 
         if(is_up){
             //Apply scaling (for best adjusting crossover smoothness)
@@ -276,12 +268,17 @@ static void do_adc_charge(port p_adc[], unsigned adc_idx, qadc_pot_state_t &adc_
     }
 }
 
-static void do_adc_start_convert(port p_adc[], unsigned adc_idx, qadc_pot_state_t &adc_pot_state, pot_timings_t &pot_timings){
-    unsigned port_idx = adc_idx / adc_pot_state.port_width;
-    p_adc[port_idx] :> int _ @ pot_timings.start_time;// Make Hi Z and grab port time
+static unsigned do_adc_start_convert(port p_adc[], unsigned adc_idx, qadc_pot_state_t &adc_pot_state, pot_timings_t &pot_timings){
+    unsigned port_idx = adc_idx / adc_pot_state.port_width; // Do these calcs before the timestamp for min offset.
+    unsigned post_charge_port_val = 0;
     // Set up an event to handle if port doesn't reach oppositie value. Set at double the max expected time. This is a fairly fatal 
-    // event which is caused by severe mismatch of hardware vs init params
+    // event which is caused by severe mismatch of hardware vs init params.
     pot_timings.time_trigger_overshoot = pot_timings.time_trigger_start_convert + (pot_timings.max_ticks_expected * 2);
+
+    // Do this last so min delay to the point where we see the port change
+    p_adc[port_idx] :> post_charge_port_val @ pot_timings.start_time;// Make Hi Z and grab port time
+
+    return post_charge_port_val;
 }
 
 static void do_adc_convert(unsigned adc_idx, qadc_pot_state_t &adc_pot_state, pot_timings_t &pot_timings){
@@ -316,14 +313,6 @@ static void do_adc_convert(unsigned adc_idx, qadc_pot_state_t &adc_pot_state, po
                     dprintf("down scale: %d (%d)\n", adc_pot_state.max_scale_down[adc_idx], new_scale);
                     adc_pot_state.max_scale_down[adc_idx] = new_scale;
                 }                             
-            }
-        }
-
-        // Check for minimum setting being smaller than port time offset (sets zero and full scale). Minimum time to trigger port select. 
-        if(conversion_time < adc_pot_state.adc_config.port_time_offset){
-            dprintf("Port offset: %lu %lu\n", conversion_time, adc_pot_state.adc_config.port_time_offset);
-            if(adc_pot_state.adc_config.auto_scale){
-                adc_pot_state.adc_config.port_time_offset = conversion_time;
             }
         }
 
@@ -390,10 +379,14 @@ void qadc_pot_task(chanend ?c_adc, port p_adc[], qadc_pot_state_t &adc_pot_state
     tmr_charge :> pot_timings.time_trigger_charge;
     pot_timings.time_trigger_charge += pot_timings.max_charge_period_ticks; // start in one charge period
 
+    // Used for determining the pin event conditions and auto zero offset
     unsigned post_charge_port_val = 0;
+    unsigned pin_event_value = 0;
+
+    // Used for mult-bit port
+    unsigned port_idx = adc_idx / adc_pot_state.port_width;
     
     while(1) unsafe{
-        unsigned port_idx = adc_idx / adc_pot_state.port_width;
         select{
             case adc_state == ADC_IDLE => tmr_charge when timerafter(pot_timings.time_trigger_charge) :> int _:
                 do_adc_charge(p_adc, adc_idx, adc_pot_state, pot_timings);
@@ -401,27 +394,33 @@ void qadc_pot_task(chanend ?c_adc, port p_adc[], qadc_pot_state_t &adc_pot_state
             break;
 
             case adc_state == ADC_CHARGING => tmr_discharge when timerafter(pot_timings.time_trigger_start_convert) :> int _:
-                p_adc[port_idx] :> post_charge_port_val; // Grab charged port val for wide version
+                adc_state = ADC_CONVERTING; // Put this here to minimise case execution time
+                post_charge_port_val = do_adc_start_convert(p_adc, adc_idx, adc_pot_state, pot_timings);
                 if(adc_pot_state.port_width == 1){
-                    post_charge_port_val = !adc_pot_state.init_port_val[adc_idx];
+                    pin_event_value = !adc_pot_state.init_port_val[adc_idx];
                 } else {
-                    post_charge_port_val = ~post_charge_port_val; // Trigger immediately so we catch the end cases
+                    pin_event_value = ~post_charge_port_val; // Trigger immediately so we catch the end cases
                 }
-                adc_state = ADC_CONVERTING;
-                do_adc_start_convert(p_adc, adc_idx, adc_pot_state, pot_timings);
             break;
 
-            case (adc_state == ADC_CONVERTING) => p_adc[port_idx] when pinsneq(post_charge_port_val) :> int port_val @ pot_timings.end_time:
+            case (adc_state == ADC_CONVERTING) => p_adc[port_idx] when pinsneq(pin_event_value) :> int port_val @ pot_timings.end_time:
                 if(adc_pot_state.port_width == 1){
+                    if(post_charge_port_val == adc_pot_state.init_port_val[adc_idx]){
+                        pot_timings.end_time = pot_timings.start_time; // End position
+                    }
                     do_adc_convert(adc_idx, adc_pot_state, pot_timings);
                 } else {
                     // Work out if the pin of interest has changed
                     unsigned bit_idx = adc_idx % adc_pot_state.port_width;
                     unsigned bit_val = (port_val >> bit_idx) & 0x01;
                     if(bit_val != adc_pot_state.init_port_val[adc_idx]){
-                        post_charge_port_val = port_val;
+                        pin_event_value = port_val;
                         break; // Keep firing select until desired bit transiton found
                     } else {
+                        unsigned post_charge_pin_val = (post_charge_port_val >> bit_idx) & 0x01;
+                        if(post_charge_pin_val == adc_pot_state.init_port_val[adc_idx]){
+                            pot_timings.end_time = pot_timings.start_time; // End position
+                        }
                         do_adc_convert(adc_idx, adc_pot_state, pot_timings);
                     }
                 }
@@ -430,6 +429,7 @@ void qadc_pot_task(chanend ?c_adc, port p_adc[], qadc_pot_state_t &adc_pot_state
                 if(++adc_idx == adc_pot_state.num_adc){
                     adc_idx = 0;
                 }
+                port_idx = adc_idx / adc_pot_state.port_width;
                 adc_state = ADC_IDLE;
             break;
 
@@ -440,6 +440,7 @@ void qadc_pot_task(chanend ?c_adc, port p_adc[], qadc_pot_state_t &adc_pot_state
                 if(++adc_idx == adc_pot_state.num_adc){
                     adc_idx = 0;
                 }
+                port_idx = adc_idx / adc_pot_state.port_width;
                 adc_state = ADC_IDLE;
             break;
 
@@ -494,11 +495,13 @@ uint16_t qadc_pot_single(port p_adc[], unsigned adc_idx, qadc_pot_state_t &adc_p
     tmr_single when timerafter(pot_timings.time_trigger_start_convert) :> int _; // Wait until fully charged
     
     unsigned post_charge_port_val = 0;
+    unsigned pin_event_value = 0;
+
     p_adc[port_idx] :> post_charge_port_val; // Grab charged port val for wide version
     if(adc_pot_state.port_width == 1){
-        unsafe{post_charge_port_val = !adc_pot_state.init_port_val[adc_idx];}
+        unsafe{pin_event_value = !adc_pot_state.init_port_val[adc_idx];}
     } else {
-        post_charge_port_val = ~post_charge_port_val; // Trigger immediately so we catch the end cases
+        pin_event_value = ~post_charge_port_val; // Trigger immediately so we catch the end cases
     }
 
     do_adc_start_convert(p_adc, adc_idx, adc_pot_state, pot_timings);
@@ -511,6 +514,9 @@ uint16_t qadc_pot_single(port p_adc[], unsigned adc_idx, qadc_pot_state_t &adc_p
             select{
                 case p_adc[port_idx] when pinsneq(post_charge_port_val) :> int port_val @ pot_timings.end_time:
                     if(adc_pot_state.port_width == 1){
+                        if(post_charge_port_val == adc_pot_state.init_port_val[adc_idx]){
+                            pot_timings.end_time = pot_timings.start_time; // End position
+                        }
                         do_adc_convert(adc_idx, adc_pot_state, pot_timings);
                         conversion_ongoing = 0;
                     } else {
@@ -518,9 +524,13 @@ uint16_t qadc_pot_single(port p_adc[], unsigned adc_idx, qadc_pot_state_t &adc_p
                         unsigned bit_idx = adc_idx % adc_pot_state.port_width;
                         unsigned bit_val = (port_val >> bit_idx) & 0x01;
                         if(bit_val != adc_pot_state.init_port_val[adc_idx]){
-                            post_charge_port_val = port_val;
+                            pin_event_value = port_val;
                             break; // Keep firing select until desired bit transiton found
                         } else {
+                            unsigned post_charge_pin_val = (post_charge_port_val >> bit_idx) & 0x01;
+                            if(post_charge_pin_val == adc_pot_state.init_port_val[adc_idx]){
+                                pot_timings.end_time = pot_timings.start_time; // End position
+                            }
                             do_adc_convert(adc_idx, adc_pot_state, pot_timings);
                             conversion_ongoing = 0;
                         }
