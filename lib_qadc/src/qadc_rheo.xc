@@ -95,7 +95,7 @@ void qadc_rheo_init( port p_adc[],
         // Set scale and clear tide marks
         for(int i = 0; i < num_adc; i++){
             adc_rheo_state.max_scale[i] = 1 << QADC_Q_3_13_SHIFT;
-            adc_rheo_state.max_seen_ticks[i] = 0;
+            adc_rheo_state.max_seen_ticks[i] = adc_rheo_state.max_disch_ticks;
         }
 
         // Set all ports to input and set drive strength to low to reduce switching noise
@@ -141,24 +141,28 @@ static inline uint16_t post_process_result( uint16_t raw_result, unsigned adc_id
         uint16_t filtered_elapsed_time = accum / result_history_depth;
 
         // Track maximums
-        if(adc_rheo_state.adc_config.auto_scale && (filtered_elapsed_time > max_seen_ticks[adc_idx])){
+        if(filtered_elapsed_time > max_seen_ticks[adc_idx]){
+            dprintf("max_seen: %u\n", max_seen_ticks[adc_idx]);
             max_seen_ticks[adc_idx] = filtered_elapsed_time;
-            // Scale here if using calib
-            // max_scale[adc_idx] = max_seen_ticks[adc_idx] << QADC_Q_3_13_SHIFT / max_discharge_period_ticks or something
-        }
-        dprintf("max_seen: %u\n", max_seen_ticks[adc_idx]);
 
-        // TODO scale to max or just use max seen and remove max_scale?
-        // ticks = ((int64_t)max_scale_up * (int64_t)ticks) >> QADC_Q_3_13_SHIFT;
+            // Scale here if using calib
+            if(adc_rheo_state.adc_config.auto_scale){
+                max_scale[adc_idx] = (max_discharge_period_ticks << QADC_Q_3_13_SHIFT) / max_seen_ticks[adc_idx];
+                dprintf("stretch scale\n");
+            }
+        }
+
+        // Scale down - max_scale grows if number of expected ticks higher. max_scale is only adjusted if adc_rheo_state.adc_config.auto_scale if set
+        uint16_t scaled_time = ((int32_t)max_scale[adc_idx] * (int32_t)filtered_elapsed_time) >> QADC_Q_3_13_SHIFT;
 
         // Clip positive
-        if(filtered_elapsed_time > max_discharge_period_ticks){
-            filtered_elapsed_time = max_discharge_period_ticks;
+        if(scaled_time > max_discharge_period_ticks){
+            scaled_time = max_discharge_period_ticks;
         }
 
         // Calculate scaled output
         uint16_t scaled_result = 0;
-        scaled_result = ((adc_steps - 1) * filtered_elapsed_time) / max_discharge_period_ticks;
+        scaled_result = ((adc_steps - 1) * scaled_time) / max_discharge_period_ticks;
 
         // Apply hysteresis
         if(scaled_result > hysteris_tracker[adc_idx] + result_hysteresis || scaled_result == (adc_steps - 1)){
