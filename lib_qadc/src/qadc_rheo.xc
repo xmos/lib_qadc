@@ -211,9 +211,9 @@ static void do_adc_charge(port p_adc[], unsigned adc_idx, qadc_rheo_state_t &adc
 
 static unsigned do_adc_start_convert(port p_adc[], unsigned adc_idx, qadc_rheo_state_t &adc_rheo_state, rheo_timings_t &rheo_timings){
     unsigned post_charge_port_val = 0;
-    p_adc[adc_idx] :> int post_charge_port_val @ rheo_timings.start_time; // Make Hi Z and grab time
-    // Setup overshoot event
     rheo_timings.time_trigger_overshoot = rheo_timings.time_trigger_discharge + adc_rheo_state.max_disch_ticks * 2;
+    p_adc[adc_idx] :> post_charge_port_val @ rheo_timings.start_time; // Make Hi Z and grab time and value
+    // Setup overshoot event
 
     return post_charge_port_val;
 }
@@ -296,7 +296,7 @@ void qadc_rheo_task(chanend ?c_adc, port p_adc[], qadc_rheo_state_t &adc_rheo_st
 
             case adc_state == ADC_CONVERTING => p_adc[adc_idx] when pinseq(0x0) :> int _ @ rheo_timings.end_time:
                 if(post_charge_port_val == 0){
-                    rheo_timings.end_time = rheo_timings.start_time; // End position
+                    rheo_timings.end_time = rheo_timings.start_time; // Zero position
                 }
                 do_adc_convert(p_adc, adc_idx, adc_rheo_state, rheo_timings, adc_mode);
                 

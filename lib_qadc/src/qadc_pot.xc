@@ -269,10 +269,10 @@ static void do_adc_charge(port p_adc[], unsigned adc_idx, qadc_pot_state_t &adc_
 }
 
 static unsigned do_adc_start_convert(port p_adc[], unsigned adc_idx, qadc_pot_state_t &adc_pot_state, pot_timings_t &pot_timings){
-    unsigned port_idx = adc_idx / adc_pot_state.port_width;
+    unsigned port_idx = adc_idx / adc_pot_state.port_width; // Do these calcs before the timestamp for min offset.
     unsigned post_charge_port_val = 0;
     // Set up an event to handle if port doesn't reach oppositie value. Set at double the max expected time. This is a fairly fatal 
-    // event which is caused by severe mismatch of hardware vs init params
+    // event which is caused by severe mismatch of hardware vs init params.
     pot_timings.time_trigger_overshoot = pot_timings.time_trigger_start_convert + (pot_timings.max_ticks_expected * 2);
 
     // Do this last so min delay to the point where we see the port change
