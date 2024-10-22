@@ -275,7 +275,7 @@ static unsigned do_adc_start_convert(port p_adc[], unsigned adc_idx, qadc_pot_st
     // event which is caused by severe mismatch of hardware vs init params
     pot_timings.time_trigger_overshoot = pot_timings.time_trigger_start_convert + (pot_timings.max_ticks_expected * 2);
 
-    // Do this last so min offset
+    // Do this last so min delay to the point where we see the port change
     p_adc[port_idx] :> post_charge_port_val @ pot_timings.start_time;// Make Hi Z and grab port time
 
     return post_charge_port_val;
@@ -382,9 +382,11 @@ void qadc_pot_task(chanend ?c_adc, port p_adc[], qadc_pot_state_t &adc_pot_state
     // Used for determining the pin event conditions and auto zero offset
     unsigned post_charge_port_val = 0;
     unsigned pin_event_value = 0;
+
+    // Used for mult-bit port
+    unsigned port_idx = adc_idx / adc_pot_state.port_width;
     
     while(1) unsafe{
-        unsigned port_idx = adc_idx / adc_pot_state.port_width;
         select{
             case adc_state == ADC_IDLE => tmr_charge when timerafter(pot_timings.time_trigger_charge) :> int _:
                 do_adc_charge(p_adc, adc_idx, adc_pot_state, pot_timings);
@@ -392,13 +394,13 @@ void qadc_pot_task(chanend ?c_adc, port p_adc[], qadc_pot_state_t &adc_pot_state
             break;
 
             case adc_state == ADC_CHARGING => tmr_discharge when timerafter(pot_timings.time_trigger_start_convert) :> int _:
+                adc_state = ADC_CONVERTING; // Put this here to minimise case execution time
                 post_charge_port_val = do_adc_start_convert(p_adc, adc_idx, adc_pot_state, pot_timings);
                 if(adc_pot_state.port_width == 1){
                     pin_event_value = !adc_pot_state.init_port_val[adc_idx];
                 } else {
                     pin_event_value = ~post_charge_port_val; // Trigger immediately so we catch the end cases
                 }
-                adc_state = ADC_CONVERTING;
             break;
 
             case (adc_state == ADC_CONVERTING) => p_adc[port_idx] when pinsneq(pin_event_value) :> int port_val @ pot_timings.end_time:
@@ -427,6 +429,7 @@ void qadc_pot_task(chanend ?c_adc, port p_adc[], qadc_pot_state_t &adc_pot_state
                 if(++adc_idx == adc_pot_state.num_adc){
                     adc_idx = 0;
                 }
+                port_idx = adc_idx / adc_pot_state.port_width;
                 adc_state = ADC_IDLE;
             break;
 
@@ -437,6 +440,7 @@ void qadc_pot_task(chanend ?c_adc, port p_adc[], qadc_pot_state_t &adc_pot_state
                 if(++adc_idx == adc_pot_state.num_adc){
                     adc_idx = 0;
                 }
+                port_idx = adc_idx / adc_pot_state.port_width;
                 adc_state = ADC_IDLE;
             break;
 
