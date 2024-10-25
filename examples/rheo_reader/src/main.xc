@@ -14,7 +14,7 @@
 
 on tile[1]: port p_adc[] = {XS1_PORT_1M, XS1_PORT_1O}; // Sets which pins are to be used (channels 0..n) X1D36/38
 
-void control_task(chanend ?c_adc, uint16_t * unsafe result_ptr){
+void qadc_rheo_continuous_example(chanend ?c_adc, uint16_t * unsafe result_ptr){
     printf("Running QADC in continuous mode using dedicated task!\n");
 
     while(1){
@@ -98,7 +98,7 @@ int main() {
                 par
                 {
                     qadc_rheo_task(NULL, p_adc, adc_rheo_state);
-                    control_task(NULL, result_ptr);
+                    qadc_rheo_continuous_example(NULL, result_ptr);
                 }
             }
 #else
@@ -107,7 +107,7 @@ int main() {
             par
             {
                 qadc_rheo_task(c_adc, p_adc, adc_rheo_state);
-                control_task(c_adc, NULL);
+                qadc_rheo_continuous_example(c_adc, NULL);
             }
 #endif // USE_SHARED_MEMORY
 #else
