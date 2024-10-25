@@ -42,7 +42,7 @@ typedef struct qadc_pot_state_t{
  */
 
 /** 
- * @brief   Macro for sizing the the state array used by QADC. Please declare a state array
+ * @brief   Macro for sizing the state array used by QADC. Please declare a state array
  *          (linear array) of uint16_t sized by this macro for passing to qadc_pot_init().
  * 
  *          num_adc - The number of channels.
@@ -95,7 +95,7 @@ void qadc_pot_init(  port p_adc[],
 
 /**
  * Perform a single ADC conversion on a specific channel. In this mode the QADC does not require a dedicated
- * task (hardware thread) to perform conversion. Note that that this is a blocking call which will
+ * task (hardware thread) to perform conversion. Note that this is a blocking call which will
  * return only when the conversion is complete. Typically it may take a few hundred microseconds (depending
  * on the RC constants chosen) but it's execution time is variable. It will take longest when the potentiometer
  * is set to roughly 1/3 and shortest as the end positions. Use this API when infrequent readings are needed

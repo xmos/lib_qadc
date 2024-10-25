@@ -74,14 +74,14 @@ typedef struct qadc_config_t{
 typedef uint16_t         qadc_q3_13_fixed_t;
 
 /** 
- * @brief   Fixed point type used internally by QADC.
+ * @brief   The shift value needed to work with qadc_q3_13_fixed_t
  */
 #define QADC_Q_3_13_SHIFT    13
 
 /**
  * Perform xcore resource setup if QADC is to be used from C with lib_xcore PAR_JOBS().
  * Because QADC is written in XC it expects ports to be enabled and an XC timer to
- * be available. This pre-init function meets those needs if using from a lib_core 
+ * be available. This pre-init function meets those needs if using from a lib_xcore 
  * based project
  *
  * \param p_adc          An array of 1 bit ports used for conversion.

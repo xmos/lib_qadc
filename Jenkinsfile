@@ -103,15 +103,13 @@ pipeline {
         stage('Tests') {
           steps { 
             dir("${REPO}/tests") {
-              withEnv(["XMOS_CMAKE_PATH=${WORKSPACE}/xcommon_cmake"]) {
-                withVenv {
-                  withTools(params.TOOLS_VERSION) {
-                    sh "cmake -G 'Unix Makefiles' -B build"
-                    sh "xmake -C build -j 8"
-                    runPytest("-vv")
-                  } // withTools
-                } // withVenv
-              } // withEnv
+              withVenv {
+                withTools(params.TOOLS_VERSION) {
+                  sh "cmake -G 'Unix Makefiles' -B build"
+                  sh "xmake -C build -j 8"
+                  runPytest("-vv")
+                } // withTools
+              } // withVenv
             } // dir
           } // steps
         } // Tests
