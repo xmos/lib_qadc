@@ -6,7 +6,7 @@
 
 /** 
  * @brief   Internal state for each QADC instance. These should not be accessed directly and instead
- *          be initialised by a call to adc_pot_init().
+ *          be initialised by a call to adc_rheo_init().
  */
 typedef struct qadc_rheo_state_t{
     size_t num_adc;
@@ -74,7 +74,7 @@ void qadc_rheo_init(port p_adc[],
 
 /**
  * Perform a single ADC conversion on a specific channel. In this mode the QADC does not require a dedicated
- * task (hardware thread) to perform conversion. Note that that this is a blocking call which will
+ * task (hardware thread) to perform conversion. Note that this is a blocking call which will
  * return only when the conversion is complete. Typically it may take a few hundred microseconds (depending
  * on the RC constants chosen) but it's execution time is variable. It will take longest when the rheostate
  * is set to maximum and shortest at zero. Use this API when infrequent readings are needed

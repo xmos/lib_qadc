@@ -17,7 +17,7 @@
 on tile[1]: port p_adc[] = {XS1_PORT_4A}; // Sets which pins are to be used (channels 0..n) X1D02/03
 
 
-void control_task(chanend ?c_adc, uint16_t * unsafe result_ptr){
+void qadc_pot_continuous_example(chanend ?c_adc, uint16_t * unsafe result_ptr){
     printf("Running QADC in continuous mode using dedicated task!\n");
     unsigned counter = 0;
 
@@ -121,7 +121,7 @@ int main() {
                 par
                 {
                     qadc_pot_task(NULL, p_adc, adc_pot_state);
-                    control_task(NULL, result_ptr);
+                    qadc_pot_continuous_example(NULL, result_ptr);
                 }
             }
 #else
@@ -130,7 +130,7 @@ int main() {
             par
             {
                 qadc_pot_task(c_adc, p_adc, adc_pot_state);
-                control_task(c_adc, NULL);
+                qadc_pot_continuous_example(c_adc, NULL);
             }
 #endif // USE_SHARED_MEMORY
 #else
