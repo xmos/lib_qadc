@@ -24,8 +24,8 @@ typedef enum adc_state_t{
 
 typedef enum adc_mode_t{
         ADC_CONVERT = 0,
-        ADC_CALIBRATION_MANUAL,
-        ADC_CALIBRATION_AUTO        // WIP
+        ADC_CALIBRATION_MANUAL, // https://github.com/xmos/lib_qadc/issues/2
+        ADC_CALIBRATION_AUTO        
 }adc_mode_t;
 
 
@@ -197,7 +197,7 @@ static void do_adc_timing_init(port p_adc[], qadc_rheo_state_t &adc_rheo_state, 
     const uint32_t convert_interval_ticks = adc_rheo_state.adc_config.convert_interval_ticks;
     const unsigned capacitor_pf = adc_rheo_state.adc_config.capacitor_pf;
     const unsigned resistor_series_ohms = adc_rheo_state.adc_config.resistor_series_ohms;
-    const int rc_times_to_charge_fully = 5; // 5 RC times should be sufficient but use double for best scaling
+    const int rc_times_to_charge_fully = 5; // 5 RC times should be sufficient but use double for best accuracy
     rheo_timings.max_charge_period_ticks = ((uint64_t)rc_times_to_charge_fully * capacitor_pf * resistor_series_ohms) / 10000;
 
     assert(convert_interval_ticks > rheo_timings.max_charge_period_ticks + adc_rheo_state.max_disch_ticks * 2); // Ensure conversion rate is low enough. *2 to allow post processing time
@@ -215,9 +215,9 @@ static void do_adc_charge(port p_adc[], unsigned adc_idx, qadc_rheo_state_t &adc
 
 static unsigned do_adc_start_convert(port p_adc[], unsigned adc_idx, qadc_rheo_state_t &adc_rheo_state, rheo_timings_t &rheo_timings){
     unsigned post_charge_port_val = 0;
+    // Setup overshoot event
     rheo_timings.time_trigger_overshoot = rheo_timings.time_trigger_discharge + adc_rheo_state.max_disch_ticks * 2;
     p_adc[adc_idx] :> post_charge_port_val @ rheo_timings.start_time; // Make Hi Z and grab time and value
-    // Setup overshoot event
 
     return post_charge_port_val;
 }
