@@ -1,12 +1,14 @@
 Quasi ADC Potentiometer Reader
 ==============================
 
+|newpage|
+
 Introduction
 ------------
 
 Xcore.ai devices offer an inexpensive way to read the value of a variable resistor (rheostat) or a potentiometer without the need for a dedicated external ADC component. The performance may be suitable for applications such as reading the position of an analog slider can may then be converted in to a gain control. Resolutions in excess of eight bits can be achieved which is adequate for many control applications.
 
-The Quasi ADC (QADC) relies on the fact that the input threshold for the xcore IO is very stable at around 1.15 V for a Vddio of 3.3 V. By charging a capacitor to the full rail and discharging it through a resistor, the RC time constant can be determined. If you know the value of C, then you can read R by timing the transition. As long as VDDIO remains constant between the charge and discharge cycles then the IO voltage component will cancel out.
+The Quasi ADC (QADC) relies on the fact that the input threshold for the xcore.ai IO is very stable at around 1.15 V for a Vddio of 3.3 V. By charging a capacitor to the full rail and discharging it through a resistor, the RC time constant can be determined. If you know the value of C, then you can read R by timing the transition. As long as VDDIO remains constant between the charge and discharge cycles then the IO voltage component will cancel out.
 
 The xcore offers precise timing of transitions of IO using port logic (in this case 10 ns resolution) so a reasonable accuracy ADC can be implemented using just a couple of additional passive components and some software.
 
@@ -67,6 +69,7 @@ Two schemes are offered which have different pros and cons depending on the appl
 
 Noise is always a concern in the analog domain and the QADC is no different. In particular power supply stability and coupled signals (such as running the QADC input close to a digital IO) should be considered when designing the circuitry. Since the QADC relies on continuously charging and discharging a capacitor it is also recommended that any analog supplies on the board are separated from the xcore digital supply to avoid any noise from the QADC conversion process being coupled to places where it would unwelcome.
 
+|newpage|
 
 Rheostat Reader
 ...............
@@ -85,7 +88,7 @@ The rheostat reader currently supports only arrays of 1 bit ports.
 
 .. _fig_qadc_rheo_schem:
 .. figure:: images/qadc_rheo_schem.drawio.png
-   :width: 80%
+   :width: 60%
 
    QADC Rheostat Circuit
 
@@ -101,6 +104,8 @@ The rheostat reader offers excellent linearity however it suffers from full scal
 
 .. note::
     If the QADC input pin is left disconnected you will see a full scale output.
+
+|newpage|
 
 Potential Reader
 ................
@@ -142,7 +147,7 @@ A small amount of noise is present when taking readings close to the threshold p
 
 .. _fig_qadc_pot_schem:
 .. figure:: images/qadc_pot_schem.drawio.png
-   :width: 80%
+   :width: 60%
 
    QADC Potentiometer Circuit
 
@@ -150,7 +155,7 @@ A small amount of noise is present when taking readings close to the threshold p
 
 .. _fig_qadc_pot_equiv_schem:
 .. figure:: images/qadc_pot_equiv_schem.drawio.png
-   :width: 80%
+   :width: 60%
 
    QADC Potentiometer Equivalent Circuit
 
@@ -158,6 +163,7 @@ A small amount of noise is present when taking readings close to the threshold p
 .. note::
     If the QADC input pin is left disconnected you will likely see a value of 35 % of full scale for the 1b port version and a value of close to zero for the wide port version.
 
+|newpage|
 
 Post Processing
 ---------------
@@ -191,8 +197,9 @@ Hysteresis
 Even after filtering it may still be possible to see some small noise signal depending on configuration. This may also be exaggerated due to the natural quantisation to a digital value by the QADC, particularly if the setting is close to a transition point. By adding a small hysteresis (say a value of one or two) additional stability can be achieved at the cost of a very small dead zone at the last position. This may desirable if the QADC output is controlling a parameter that may be noticeable if it hunts between one or more positions. The hysteresis is configurable and may be removed completely if needed by setting to 0.
 
 
-.. _effect_passives:
+|newpage|
 
+.. _effect_passives:
 
 Comparing the Effect of Passive Component Tolerance on Both Schemes
 -------------------------------------------------------------------
@@ -236,6 +243,7 @@ The small steps in the transfer curve close to zero and full scale settings are 
 
 This theoretical behavior has been verified as shown in the :ref:`Hardware Characterisation <characterise>` section of this document.
 
+|newpage|
 
 .. _passive_selection:
 
@@ -269,6 +277,8 @@ Typical values recommended are:
 
 
 .. _tuning:
+
+|newpage|
 
 QADC Tuning
 -----------
@@ -316,7 +326,7 @@ The ``max_charge_period_ticks`` is nominally 5 times the RC constant and ``max_d
 
 In ``single shot`` mode the setting is ignore because the API takes the correct amount of time to account for all required steps.
 
-
+|newpage|
 
 QADC Usage
 ----------
@@ -345,9 +355,9 @@ When infrequent conversions are made using ``single shot`` mode it is recommende
 The examples included in `the QADC repo <https://github.com/xmos/lib_qadc>`_ under ``/examples`` show the single shot mode in use.
 
 
+|newpage|
 
 .. _api:
-
 
 QADC API
 --------
@@ -392,6 +402,7 @@ Specific items for the Potentiometer QADC are shown here.
 .. doxygengroup:: lib_qadc_pot_reader
    :content-only:
 
+|newpage|
 
 Building and running the examples
 ---------------------------------
@@ -460,9 +471,9 @@ In each case the converted QADC values will be periodically printed to the conso
     ...
 
 
+|newpage|
 
 .. _characterise:
-
 
 Hardware Characterisation of QADC Potentiometer Transfer Curve
 --------------------------------------------------------------
