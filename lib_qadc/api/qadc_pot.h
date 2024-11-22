@@ -74,7 +74,8 @@ typedef struct qadc_pot_state_t{
  *
  * \param p_adc         An array of ports used for conversion. Must all be of same time (eg. 1b or 4b ports)
  * \param num_adc       The number of ADC channels needed. Where ports other than 1b ports are used, the lower pins
- *                      on the port are used first. Eg. bottom 2 pins of a 4b port are used if num_adc = 2.
+ *                      on the port are used first. Eg. bottom 2 pins of a 4b port are used if num_adc = 2. The other
+ *                      pins on the port are reserved.
  * \param lut_size      The size of the look up table. Also sets the output result full scale value to lut_size - 1.
  * \param filter_depth  The size of the moving average filter used to average each conversion result. 
  * \param state_buffer  pointer to the state buffer used of type uint16_t. Please use the ADC_POT_STATE_SIZE
