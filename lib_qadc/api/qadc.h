@@ -84,8 +84,8 @@ typedef uint16_t         qadc_q3_13_fixed_t;
  * be available. This pre-init function meets those needs if using from a lib_xcore 
  * based project
  *
- * \param p_adc          An array of 1 bit ports used for conversion.
- * \param num_adc        The number of QADC channels (ports) used
+ * \param p_adc          An array of ports used for conversion.
+ * \param num_adc        The number of QADC channels used
  */ 
 void qadc_pre_init_c(port p_adc[], size_t num_adc);
 
