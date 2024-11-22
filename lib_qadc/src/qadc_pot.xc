@@ -125,14 +125,13 @@ static inline unsigned ticks_to_position(int is_up, uint16_t ticks, unsigned adc
         if(is_up){
             //Apply scaling (for best adjusting crossover smoothness)
             ticks = (uint32_t)ticks << QADC_Q_3_13_SHIFT / max_scale_up;
-            // ticks = ((int64_t)max_scale_up * (int64_t)ticks) >> QADC_Q_3_13_SHIFT;
             
             uint16_t max = 0;
             max_arg = num_points - 1;
             for(int i = num_points - 1; i >= 0; i--){
                 if(ticks > up[i]){
                     if(up[i] > max){
-                        max_arg = i - 1;
+                        max_arg = i;
                         max = up[i];
                     } 
                 }
@@ -140,7 +139,6 @@ static inline unsigned ticks_to_position(int is_up, uint16_t ticks, unsigned adc
         } else {
             //Apply scaling (for best adjusting crossover smoothness)
             ticks = (uint32_t)ticks << QADC_Q_3_13_SHIFT / max_scale_down;
-            // ticks = ((int64_t)max_scale_down * (int64_t)ticks) >> QADC_Q_3_13_SHIFT;
 
             int16_t max = 0;
             for(int i = 0; i < num_points; i++){
