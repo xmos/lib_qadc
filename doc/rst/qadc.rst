@@ -324,7 +324,7 @@ The QADC will check the set values and automatically assert if the following con
 
 The ``max_charge_period_ticks`` is nominally 5 times the RC constant and ``max_disch_ticks`` is calculated by the code as the maximum time to reach the threshold voltage when the IO goes high impedance. This is doubled to allow for some idle time and provides a safe setting. A typical setting will be in the region of one millisecond, depending on passive value selection.
 
-In ``single shot`` mode the setting is ignore because the API takes the correct amount of time to account for all required steps.
+In ``single shot`` mode the setting is ignored because the API takes the correct amount of time to account for all required steps and the function returns when the result is ready.
 
 |newpage|
 
