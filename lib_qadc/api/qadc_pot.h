@@ -72,18 +72,20 @@ typedef struct qadc_pot_state_t{
  * 
  * IF CALLING FROM C WITH lib_xcore's PAR_JOBS() TO START THE THREADS, PLEASE CALL qadc_c_pre_init() FIRST.
  *
- * \param p_adc         An array of 1 bit ports used for conversion.
- * \param num_adc       The number of 1 bit ports (QADC channels) used.
+ * \param p_adc         An array of ports used for conversion. Must all be of same time (eg. 1b or 4b ports)
+ * \param num_adc       The number of ADC channels needed. Where ports other than 1b ports are used, the lower pins
+ *                      on the port are used first. Eg. bottom 2 pins of a 4b port are used if num_adc = 2. The other
+ *                      pins on the port are reserved.
  * \param lut_size      The size of the look up table. Also sets the output result full scale value to lut_size - 1.
- * \param filter_depth  The size of the moving average filter used to average each conversion result.   
+ * \param filter_depth  The size of the moving average filter used to average each conversion result. 
  * \param state_buffer  pointer to the state buffer used of type uint16_t. Please use the ADC_POT_STATE_SIZE
- *                      macro to size the declaration of the state buffer.
+ *                      macro to size the declaration of this state buffer.
  * \param adc_config    A struct of type qadc_config_t containing the parameters of the QADC external components
  *                      and conversion rate / mode. This must be initialised before passing to qadc_pot_init().
  * \param adc_pot_state Reference to the qadc_pot_state_t struct which contains internal state for the QADC. This
  *                      does not need to be initialised before hand since this function does that.
  */ 
-void qadc_pot_init(  port p_adc[],
+void qadc_pot_init( port p_adc[],
                     size_t num_adc,
                     size_t lut_size,
                     size_t filter_depth,
@@ -102,7 +104,7 @@ void qadc_pot_init(  port p_adc[],
  * and the callee can accept a blocking call.
  * qadc_pot_init() must be called before this function.
  *
- * \param p_adc          An array of 1 bit ports used for conversion.
+ * \param p_adc          An array of ports used for conversion.
  * \param adc_idx        The QADC channel to read.
  * \param qadc_pot_state Reference to the qadc_pot_state_t struct which contains internal state for the QADC. 
  */ 
@@ -127,7 +129,7 @@ DECLARE_JOB(qadc_pot_task, (chanend_t, port_t*, qadc_pot_state_t*));
  * qadc_pot_init() must be called before this task is started.
  * 
  * \param c_adc         Channel for collecting results and controlling the QADC.
- * \param p_adc         An array of 1 bit ports used for conversion.
+ * \param p_adc         An array of ports used for conversion.
  * \param adc_config    A struct of type qadc_config_t containing the parameters of the QADC external components
  *                      and conversion rate / mode. This must be initialised before by qadc_pot_init() before-calling this task.
  */

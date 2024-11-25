@@ -1,6 +1,6 @@
 // This file relates to internal XMOS infrastructure and should be ignored by external users
 
-@Library('xmos_jenkins_shared_library@v0.34.0')
+@Library('xmos_jenkins_shared_library@v0.35.0')
 
 def runningOn(machine) {
   println "Stage running on:"
@@ -23,7 +23,7 @@ pipeline {
     )
     string(
     name: 'XMOSDOC_VERSION',
-    defaultValue: 'v6.1.3',
+    defaultValue: 'v6.2.0',
     description: 'The xmosdoc version'
     )
     string(
@@ -117,8 +117,6 @@ pipeline {
       post {
         always {
           archiveArtifacts artifacts: "**/tests/*.png", fingerprint: true, allowEmptyArchive: true
-          // junit '**/reports/*.xml'
-          // TODO re-enable when using Pytest
         }
         cleanup {
           xcoreCleanSandbox()
