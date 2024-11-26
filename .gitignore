@@ -1,0 +1,8 @@
+examples/pot_reader/.build
+filter_settings.h
+pot_lut.bin
+doc/_build
+test_junit.xml
+pytest_result.xml
+cal_table.bin
+params.txt
