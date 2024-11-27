@@ -13,8 +13,16 @@ root_dir = Path(__file__).parent.parent.absolute()
 sys.path.append(str(root_dir/"design"))
 from qadc_model import qadc_rheo, qadc_pot, plot_curve
 
+# Default setup for params
+r_rheo_nom = 47000
+r_pot_nom = 47000
+cap_pf = 2200
+r_series = 470
+v_rail = 3.3
+v_thresh = 1.17
 
-def sim_sweep(model_cal, models_used, tolernace, num_points=1024):
+
+def sim_sweep(model_cal, models_used, tolernace, tol_param, num_points=1024):
     if isinstance(models_used, type(model_cal)) == 1:
         num_models = 1
         models_used =[models_used]
@@ -40,41 +48,43 @@ def sim_sweep(model_cal, models_used, tolernace, num_points=1024):
         
     err_positions = [err_positions[m] for m in range(num_models)]
     y_values = [est_positions] + err_positions      
-    plot_curve(positions, y_values, figname = f"Effect_of_pot_tolerance_{tolernace}%_{model.name}", y_label='Estimated position')
+    plot_curve(positions, y_values, figname = f"Effect_of_{tol_param}_tolerance_{tolernace}%_{model.name}", y_label='Estimated position')
 
-
-
-def qadc_rheo_test(tolerance_pc):
-    r_rheo_nom = 47000
-    cap_pf = 2200
-    r_series = 470
-    v_rail = 3.3
-    v_thresh = 1.14
-
-    qadc = qadc_rheo(cap_pf, r_rheo_nom, r_series, 3.3, v_thresh)
+# Simulate the effect of VR tolerance shift
+def qadc_rheo_test_rc_tol(tolerance_pc):
+    qadc = qadc_rheo(cap_pf, r_rheo_nom, r_series, v_rail, v_thresh)
     qadc_rheo_is_under = qadc_rheo(cap_pf, r_rheo_nom * (1-(tolerance_pc/100)), r_series, v_rail, v_thresh)
     qadc_rheo_is_over = qadc_rheo(cap_pf, r_rheo_nom * (1+(tolerance_pc/100)), r_series, v_rail, v_thresh)
-    sim_sweep(qadc, (qadc_rheo_is_under, qadc_rheo_is_over), tolerance_pc)
+    sim_sweep(qadc, (qadc_rheo_is_under, qadc_rheo_is_over), tolerance_pc, "vr")
 
-
-def qadc_pot_test(tolerance_pc):
-    r_pot_nom = 47000
-    cap_pf = 2200
-    r_series = 470
-    v_rail = 3.3
-    v_thresh = 1.14
-
-    qadc = qadc_pot(cap_pf, r_pot_nom, r_series, 3.3, v_thresh)
+def qadc_pot_test_rc_tol(tolerance_pc):
+    qadc = qadc_pot(cap_pf, r_pot_nom, r_series, v_rail, v_thresh)
     qadc_pot_is_under = qadc_pot(cap_pf, r_pot_nom * (1-(tolerance_pc/100)), r_series, v_rail, v_thresh)
     qadc_pot_is_over = qadc_pot(cap_pf, r_pot_nom * (1+(tolerance_pc/100)), r_series, v_rail, v_thresh)
-    sim_sweep(qadc, (qadc_pot_is_under, qadc_pot_is_over), tolerance_pc)
+    sim_sweep(qadc, (qadc_pot_is_under, qadc_pot_is_over), tolerance_pc, "vr")
 
+
+# Simulate the effect of threshold voltage shift
+def qadc_rheo_test_thresh_tol(tolerance_pc):
+    qadc = qadc_rheo(cap_pf, r_rheo_nom, r_series, v_rail, v_thresh)
+    qadc_rheo_is_under = qadc_rheo(cap_pf, r_rheo_nom, r_series, v_rail, v_thresh * (1-(tolerance_pc/100)))
+    qadc_rheo_is_over = qadc_rheo(cap_pf, r_rheo_nom, r_series, v_rail, v_thresh * (1+(tolerance_pc/100)))
+    sim_sweep(qadc, (qadc_rheo_is_under, qadc_rheo_is_over), tolerance_pc, "threshold")
+
+def qadc_pot_test_thresh_tol(tolerance_pc):
+    qadc = qadc_pot(cap_pf, r_pot_nom, r_series, v_rail, v_thresh)
+    qadc_pot_is_under = qadc_pot(cap_pf, r_pot_nom, r_series, v_rail, v_thresh * (1-(tolerance_pc/100)))
+    qadc_pot_is_over = qadc_pot(cap_pf, r_pot_nom, r_series, v_rail, v_thresh * (1+(tolerance_pc/100)))
+    sim_sweep(qadc, (qadc_pot_is_under, qadc_pot_is_over), tolerance_pc, "threshold")
+
+# Pytest tests
 def test_tolernace_pot():
-    qadc_pot_test(20)
+    qadc_pot_test_rc_tol(20)
 
 def test_tolernace_rheo():
-    qadc_rheo_test(20)
+    qadc_rheo_test_rc_tol(20)
 
+# For running locally
 if __name__ == "__main__":
-    test_tolernace_pot()
-    test_tolernace_rheo()
+    qadc_rheo_test_thresh_tol(10)
+    qadc_pot_test_thresh_tol(10)
