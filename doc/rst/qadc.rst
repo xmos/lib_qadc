@@ -6,7 +6,7 @@ Quasi ADC Potentiometer Reader
 Introduction
 ------------
 
-Xcore.ai devices offer an inexpensive way to read the value of a variable resistor (rheostat) or a potentiometer without the need for a dedicated external ADC component. The performance may be suitable for applications such as reading the position of an analog slider can may then be converted in to a gain control. Resolutions in excess of eight bits can be achieved which is adequate for many control input applications.
+Xcore.ai devices offer an inexpensive way to read the value of a variable resistor (rheostat) or a potentiometer without the need for a dedicated external ADC component. The performance may be suitable for applications such as reading the position of an analog slider to be used as a gain control. Resolutions in excess of eight bits can be achieved which is adequate for many control input applications.
 
 The Quasi ADC (QADC) relies on the fact that the input threshold for the xcore.ai IO is stable at around 1.15 V for a Vddio of 3.3 V. By charging a capacitor to the full rail and discharging it through a resistor, the RC time constant can be determined. If you know the value of C, then you can read R by timing the transition. 
 
