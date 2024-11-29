@@ -13,7 +13,7 @@ The Quasi ADC (QADC) relies on the fact that the input threshold for the xcore.a
 The xcore offers precise timing of transitions of IO using port logic (in this case 10 ns resolution) so a reasonable accuracy ADC can be implemented using just a couple of additional passive components and some software.
 
 
-Two schemes are offered which have different pros and cons depending on the application. Unless very tight component tolerances or a manufacturing calibration step are possible, it is recommended to use the potentiometer scheme is used. The table below summarises the approaches.
+Two schemes are offered which have different pros and cons depending on the application. Unless very tight component tolerances or a manufacturing calibration step are possible, it is recommended to use the potentiometer scheme. The table below summarises the approaches.
 
 
 .. _fig_src_filters:
