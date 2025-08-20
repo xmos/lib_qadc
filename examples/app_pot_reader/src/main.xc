@@ -1,4 +1,4 @@
-// Copyright 2024 XMOS LIMITED.
+// Copyright 2025 XMOS LIMITED.
 // This Software is subject to the terms of the XMOS Public Licence: Version 1.
 
 #include <platform.h>
@@ -95,7 +95,7 @@ int main() {
             const char auto_scale = 0;
 
             const unsigned convert_interval_ticks = (1 * XS1_TIMER_KHZ); // 1 millisecond
-            
+
             const qadc_config_t adc_config = {  capacitor_pf,
                                                 potentiometer_ohms,
                                                 resistor_series_ohms,

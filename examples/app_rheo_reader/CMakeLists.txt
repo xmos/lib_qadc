@@ -1,13 +1,13 @@
 cmake_minimum_required(VERSION 3.21)
 include($ENV{XMOS_CMAKE_PATH}/xcommon.cmake)
 
-project(qadc_rheo_example)
+project(app_rheo_reader)
 
 set(APP_HW_TARGET XK-EVK-XU316)
 set(APP_DEPENDENT_MODULES               lib_qadc)
 
 set(COMMON_COMPILER_FLAGS               -Os
-                                        -g 
+                                        -g
                                         -report)
 
 set(APP_COMPILER_FLAGS_CONTINUOUS_CHAN  ${COMMON_COMPILER_FLAGS}

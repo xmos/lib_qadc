@@ -1,22 +1,20 @@
 :orphan:
 
-
-###########################
-lib_qadc: Quasi ADC Library
-###########################
-
+##############################
+lib_qadc: Quasi ADC using GPIO
+##############################
 
 :vendor: XMOS
-:version: 1.0.0
+:version: 1.0.1
 :scope: General Use
-:description: Resistor reading library
+:description: Quasi ADC for reading variable resistors using GPIO
 :category: General Purpose
-:keywords: ADC, potentiometer, rheostat, slider, control
+:keywords: ADC
 :devices: xcore.ai
 
-********
-Overview
-********
+*******
+Summary
+*******
 
 The xcore.ai family offers an inexpensive way to read the value of a variable resistor (rheostat) or a potentiometer without the need for a dedicated ADC component. It uses known RC delay characteristics to determine the value of the resistor and only requires two additional passive components per channel.
 
@@ -34,43 +32,40 @@ Features
  * Filtering and hysteresis functions for smoothing noise
  * Continuous conversion (using a thread) or single shot API via function call
 
-**************
-Resource Usage
-**************
-
-The Rheostat reader requires 3 kB and either one thread (continuous operation) or ~300 microseconds of CPU time per conversion.
-
-For a two channel, 8 bit (256 output levels) with a 16 entry moving average filter, the Potentiometer reader requires 5 kB and either one thread (continuous operation) or around ~300 microseconds of CPU time per conversion.
-
-
-*************************
-Related Application Notes
-*************************
-
-  * None
-
-Two simple examples, written to run on the ``XK-EVK-XU316`` (xcore.ai explorer) board, can be found in the ``/examples`` directory.
-
 ************
-Known Issues
+Known issues
 ************
 
-  * Calibration mode not yet implemented for Rheostat reader.
+* Calibration mode not yet implemented for Rheostat reader.
+
+****************
+Development repo
+****************
+
+* `lib_qadc <https://www.github.com/xmos/lib_qadc>`_
 
 **************
-Required Tools
+Required tools
 **************
 
-  * XMOS XTC Tools: 15.3.0
+* XMOS XTC Tools: 15.3.1
 
 *********************************
-Required Libraries (dependencies)
+Required libraries (dependencies)
 *********************************
 
-  * None
+* None
+
+*************************
+Related application notes
+*************************
+
+* None
 
 *******
 Support
 *******
 
-This package is supported by XMOS Ltd. Issues can be raised against the software at www.xmos.com/support
+This package is supported by XMOS Ltd. Issues can be raised against the software at
+`www.xmos.com/support <https://www.xmos.com/support>`_
+

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.21)
 include($ENV{XMOS_CMAKE_PATH}/xcommon.cmake)
 project(lib_qadc_examples)
-add_subdirectory(pot_reader)
-add_subdirectory(rheo_reader)
+add_subdirectory(app_pot_reader)
+add_subdirectory(app_rheo_reader)
