@@ -1,10 +1,9 @@
-// Copyright 2024 XMOS LIMITED.
+// Copyright 2024-2025 XMOS LIMITED.
 // This Software is subject to the terms of the XMOS Public Licence: Version 1.
 
 #pragma once
-#include "qadc.h"
 
-/** 
+/**
  * @brief   Internal state for each QADC instance. These should not be accessed directly and instead
  *          be initialised by a call to adc_pot_init().
  */
@@ -41,15 +40,15 @@ typedef struct qadc_pot_state_t{
  * @{
  */
 
-/** 
+/**
  * @brief   Macro for sizing the state array used by QADC. Please declare a state array
  *          (linear array) of uint16_t sized by this macro for passing to qadc_pot_init().
- * 
+ *
  *          num_adc - The number of channels.
- * 
+ *
  *          lut_size - The size of the look up table. Also sets the maximum conversion value to (lut_size - 1).
  *          One LUT is used for all channels.
- * 
+ *
  *          filter_depth - The depth of the moving average filter (1 to n). Has a large impact on the memory requirements
  *          because each channel requires it's own filter.
  */
@@ -66,10 +65,10 @@ typedef struct qadc_pot_state_t{
 
 
 /**
- * Initialise a QADC potentiometer reader instance and initialise the qadc_pot_state structure. 
+ * Initialise a QADC potentiometer reader instance and initialise the qadc_pot_state structure.
  * This generates the look up table, initialises the state and sets up the ports used by the QADC.
  * Must be called before either qadc_pot_single() or qadc_pot_task().
- * 
+ *
  * IF CALLING FROM C WITH lib_xcore's PAR_JOBS() TO START THE THREADS, PLEASE CALL qadc_c_pre_init() FIRST.
  *
  * \param p_adc         An array of ports used for conversion. Must all be of same time (eg. 1b or 4b ports)
@@ -77,14 +76,14 @@ typedef struct qadc_pot_state_t{
  *                      on the port are used first. Eg. bottom 2 pins of a 4b port are used if num_adc = 2. The other
  *                      pins on the port are reserved.
  * \param lut_size      The size of the look up table. Also sets the output result full scale value to lut_size - 1.
- * \param filter_depth  The size of the moving average filter used to average each conversion result. 
+ * \param filter_depth  The size of the moving average filter used to average each conversion result.
  * \param state_buffer  pointer to the state buffer used of type uint16_t. Please use the ADC_POT_STATE_SIZE
  *                      macro to size the declaration of this state buffer.
  * \param adc_config    A struct of type qadc_config_t containing the parameters of the QADC external components
  *                      and conversion rate / mode. This must be initialised before passing to qadc_pot_init().
  * \param adc_pot_state Reference to the qadc_pot_state_t struct which contains internal state for the QADC. This
  *                      does not need to be initialised before hand since this function does that.
- */ 
+ */
 void qadc_pot_init( port p_adc[],
                     size_t num_adc,
                     size_t lut_size,
@@ -106,8 +105,8 @@ void qadc_pot_init( port p_adc[],
  *
  * \param p_adc          An array of ports used for conversion.
  * \param adc_idx        The QADC channel to read.
- * \param qadc_pot_state Reference to the qadc_pot_state_t struct which contains internal state for the QADC. 
- */ 
+ * \param qadc_pot_state Reference to the qadc_pot_state_t struct which contains internal state for the QADC.
+ */
 uint16_t qadc_pot_single(port p_adc[], unsigned adc_idx, REFERENCE_PARAM(qadc_pot_state_t, qadc_pot_state));
 
 #if defined(__XC__) || defined(__DOXYGEN__)
@@ -118,7 +117,7 @@ DECLARE_JOB(qadc_pot_task, (chanend_t, port_t*, qadc_pot_state_t*));
  * Starts a task that will continuously cycle through all QADC inputs and convert each in turn. It will assert if
  * the time taken to convert is longer than convert_interval_ticks set in qadc_config.
  * The task will apply post processing to the raw result including filtering and hysteresis.
- * 
+ *
  * The task may be placed on a different tile from the client if channel communication is used.
  * Optionally, a NULL parameter can be passed to the channel and the results in no channel being required.
  * In the channel-less case the results may be read directly out of the first N entries of ``state_buffer``
@@ -127,7 +126,7 @@ DECLARE_JOB(qadc_pot_task, (chanend_t, port_t*, qadc_pot_state_t*));
  * the QADC and the client need to share the same memory space.
  *
  * qadc_pot_init() must be called before this task is started.
- * 
+ *
  * \param c_adc         Channel for collecting results and controlling the QADC.
  * \param p_adc         An array of ports used for conversion.
  * \param adc_config    A struct of type qadc_config_t containing the parameters of the QADC external components

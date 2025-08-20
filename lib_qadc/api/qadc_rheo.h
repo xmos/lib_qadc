@@ -1,10 +1,9 @@
-// Copyright 2024 XMOS LIMITED.
+// Copyright 2024-2025 XMOS LIMITED.
 // This Software is subject to the terms of the XMOS Public Licence: Version 1.
 
 #pragma once
-#include "qadc.h"
 
-/** 
+/**
  * @brief   Internal state for each QADC instance. These should not be accessed directly and instead
  *          be initialised by a call to adc_rheo_init().
  */
@@ -46,23 +45,23 @@ typedef struct qadc_rheo_state_t{
                              (sizeof(uint16_t) - 1)) / sizeof(uint16_t))
 
 /**
- * Initialise a QADC rheostate reader instance and initialise the qadc_rheo_state structure. 
+ * Initialise a QADC rheostate reader instance and initialise the qadc_rheo_state structure.
  * This generates the look up table, initialises the state and sets up the ports used by the QADC.
  * Must be called before either qadc_rheo_single() or qadc_rheo_task().
- * 
+ *
  * IF CALLING FROM C WITH lib_xcore's PAR_JOBS() TO START THE THREADS, PLEASE CALL qadc_c_pre_init() FIRST.
  *
  * \param p_adc             An array of 1 bit ports used for conversion.
  * \param num_adc           The number of 1 bit ports (QADC channels) used.
  * \param adc_steps         The number of discrete conversion possible values. Also sets the output result full scale value to lut_size - 1.
- * \param filter_depth      The size of the moving average filter used to average each conversion result.   
+ * \param filter_depth      The size of the moving average filter used to average each conversion result.
  * \param state_buffer      pointer to the state buffer used of type uint16_t. Please use the ADC_POT_STATE_SIZE
  *                          macro to size the declaration of the state buffer.
  * \param adc_config        A struct of type qadc_config_t containing the parameters of the QADC external components
  *                          and conversion rate / mode. This must be initialised before passing to qadc_rheo_init().
  * \param adc_rheo_state    Reference to the qadc_rheo_state_t struct which contains internal state for the QADC. This
  *                          does not need to be initialised before hand since this function does that.
- */ 
+ */
 void qadc_rheo_init(port p_adc[],
                     size_t num_adc,
                     size_t adc_steps,
@@ -83,7 +82,7 @@ void qadc_rheo_init(port p_adc[],
  *
  * \param p_adc             An array of 1 bit ports used for conversion.
  * \param adc_idx           The QADC channel to read.
- * \param adc_rheo_state    Reference to the adc_rheo_state_t struct which contains internal state for the QADC. 
+ * \param adc_rheo_state    Reference to the adc_rheo_state_t struct which contains internal state for the QADC.
  */
 uint16_t qadc_rheo_single(port p_adc[], unsigned adc_idx, REFERENCE_PARAM(qadc_rheo_state_t, adc_rheo_state));
 
@@ -95,7 +94,7 @@ DECLARE_JOB(qadc_rheo_task, (chanend_t, port_t*, qadc_rheo_state_t*));
  * Starts a task that will continuously cycle through all QADC inputs and convert each in turn. It will assert if
  * the time taken to convert is longer than convert_interval_ticks set in qadc_config.
  * The task will apply post processing to the raw result including filtering and hysteresis.
- * 
+ *
  * The task may be placed on a different tile from the client if channel communication is used.
  * Optionally, a NULL parameter can be passed to the channel and the results in no channel being required.
  * In the channel-less case the results may be read directly out of the first N entries of ``state_buffer``
@@ -104,7 +103,7 @@ DECLARE_JOB(qadc_rheo_task, (chanend_t, port_t*, qadc_rheo_state_t*));
  * the QADC and the client need to share the same memory space.
  *
  * qadc_rheo_init() must be called before this task is started.
- * 
+ *
  * \param c_adc         Channel for collecting results and controlling the QADC.
  * \param p_adc         An array of 1 bit ports used for conversion.
  * \param adc_config    A reference to struct of type qadc_rheo_state_t containing the parameters of the QADC external components

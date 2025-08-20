@@ -1,4 +1,4 @@
-// Copyright 2024 XMOS LIMITED.
+// Copyright 2025 XMOS LIMITED.
 // This Software is subject to the terms of the XMOS Public Licence: Version 1.
 
 #include <platform.h>
@@ -88,7 +88,7 @@ int main() {
             // Only use moving average filter if in continuous mode
             unsigned used_filter_depth = (CONTINUOUS == 1) ? FILTER_DEPTH : 1;
             qadc_rheo_init(p_adc, NUM_ADC, NUM_STEPS, used_filter_depth, HYSTERESIS, state_buffer, adc_config, adc_rheo_state);
-            
+
  #if (CONTINUOUS == 1)
 // The continuous mode allows for a shared memory interface if the QADC is on the same tile.
 #if USE_SHARED_MEMORY

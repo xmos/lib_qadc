@@ -1,20 +1,18 @@
-Quasi ADC Potentiometer Reader
-==============================
+####################
+Quasi ADC using GPIO
+####################
 
-|newpage|
-
+************
 Introduction
-------------
+************
 
-Xcore.ai devices offer an inexpensive way to read the value of a variable resistor (rheostat) or a potentiometer without the need for a dedicated external ADC component. The performance may be suitable for applications such as reading the position of an analog slider to be used as a gain control. Resolutions in excess of eight bits can be achieved which is adequate for many control input applications.
+`xcore.ai` devices offer an inexpensive way to read the value of a variable resistor (rheostat) or potentiometer without requiring an external ADC. The performance is suitable for applications such as reading the position of an analog slider for gain control. Effective resolutions exceeding eight bits can be achieved, which is sufficient for many control applications.
 
-The Quasi ADC (QADC) relies on the fact that the input threshold for the xcore.ai IO is stable at around 1.15 V for a Vddio of 3.3 V. By charging a capacitor to the full rail and discharging it through a resistor, the RC time constant can be determined. If you know the value of C, then you can read R by timing the transition. 
+The Quasi ADC (QADC) relies on the stable input threshold of the `xcore.ai` IO, around 1.15 V when Vddio is 3.3 V. By charging a capacitor to the supply rail and discharging it through a resistor, the RC time constant — and hence the resistance value — can be measured by timing the voltage transition.
 
-The xcore offers precise timing of transitions of IO using port logic (in this case 10 ns resolution) so a reasonable accuracy ADC can be implemented using just a couple of additional passive components and some software.
+The `xcore` provides precise IO timing through its port logic (10 ns resolution in this case), allowing a reasonably accurate ADC to be implemented with just a couple of passive components and supporting software.
 
-
-Two schemes are offered which have different pros and cons depending on the application. Unless very tight component tolerances or a manufacturing calibration step are possible, it is recommended to use the potentiometer scheme. The table below summarises the approaches.
-
+Two schemes are available, each with advantages and disadvantages depending on the application. Unless tight component tolerances or manufacturing calibration are possible, the potentiometer scheme is recommended. Table 1 summarises the two approaches.
 
 .. _fig_src_filters:
 .. list-table:: QADC Comparison
@@ -48,7 +46,7 @@ Two schemes are offered which have different pros and cons depending on the appl
      * - Number of channels
        - Limited by port count only
        - Limited by port count only
-     * - Typical ENOBs post filtering 
+     * - Typical ENOBs post filtering
        - 8+
        - 8+
      * - Requires 5 % capacitor (eg C0G)
@@ -67,12 +65,15 @@ Two schemes are offered which have different pros and cons depending on the appl
        - 3 kB
        - 5 kB
 
-Noise is always a concern in the analog domain and the QADC is no different. In particular power supply stability and coupled signals (such as running the QADC input close to a digital IO) should be considered when designing the circuitry. Since the QADC relies on continuously charging and discharging a capacitor it is also recommended that any analog supplies on the board are separated from the xcore digital supply to avoid any noise from the QADC conversion process being coupled to places where it would unwelcome.
+Noise is always a concern in the analog domain, and the QADC is no exception. In particular, power supply stability and signal coupling (for example, when routing the QADC input close to digital IO signals) should be considered when designing the circuitry.
+
+Since the QADC relies on continuously charging and discharging a capacitor, it is recommended that any analog supplies on the board be kept separate from the `xcore` digital supply. This helps prevent noise generated during the QADC conversion process from coupling into parts of the system where it would be unwelcome.
 
 |newpage|
 
+***************
 Rheostat Reader
-...............
+***************
 
 The rheostat reader uses just two terminals of a potentiometer and treats it as variable resistor (rheostat). The scheme works as follows:
 
@@ -92,8 +93,7 @@ The rheostat reader currently supports only arrays of 1 bit ports.
 
    QADC Rheostat Circuit
 
-
-The rheostat reader offers excellent linearity however it suffers from full scale setting accuracy if the passive components have large tolerances. This may result, for example with 20% tolerances, in full scale being read at 80% (and beyond) of the travel or only 80% being registered at the end of the travel. See the :ref:`effect of passive components <effect_passives>` section for more details.
+The rheostat reader offers excellent linearity; however, it is sensitive to full-scale accuracy when the passive components have wide tolerances. For example, with 20% tolerances, the full scale may be reached at only 80% of the travel, or conversely, only 80% may be registered at the end of the travel. See :ref:`effect of passive components <effect_passives>` for more details.
 
 
 .. _fig_qadc_rheo_ticks:
@@ -107,8 +107,9 @@ The rheostat reader offers excellent linearity however it suffers from full scal
 
 |newpage|
 
+****************
 Potential Reader
-................
+****************
 
 The potential reader uses all three terminals of a potentiometer where the track end terminals are connected between ground and Vddio. Depending on the initial reading of the IO pin, the QADC either charges the capacitor to Vddio or discharges it ground and then times the transition through the threshold point to the potential set by the potentiometer, via the equivalent resistance of the potentiometer. The equivalent resistance of the potentiometer is the parallel of the upper and lower sections between the wiper and the end terminals added to the series resistor.
 
@@ -142,7 +143,7 @@ The rheostat reader currently supports arrays of any port width with the proviso
 
 The potential reader offers good performance and is less susceptible to component tolerances due to the mathematics of using a parallel resistor network and the logarithm used. It will always achieve zero and full scale however if tolerances are too large then it may show worse non-linearity than the rheostat reader and, in particular, around the 35% setting point which corresponds the threshold voltage of the IO. It does however always remain monotonic in operation. See the :ref:`effect of passive components <effect_passives>` section for more details.
 
-A small amount of noise is present when taking readings close to the threshold point. A moving average filter is typically used and so these non-linearities are reduced in practice and more than eight bits of resolution can easily be achieved. 
+A small amount of noise is present when taking readings close to the threshold point. A moving average filter is typically used and so these non-linearities are reduced in practice and more than eight bits of resolution can easily be achieved.
 
 
 .. _fig_qadc_pot_schem:
@@ -166,7 +167,7 @@ A small amount of noise is present when taking readings close to the threshold p
 |newpage|
 
 Post Processing
----------------
+===============
 
 Both QADC schemes benefit from post processing of the raw measured transition time to improve performance.
 
@@ -182,17 +183,17 @@ The included post processing steps are as follows:
 
 
 Moving Average Filter
-.....................
+---------------------
 
 The moving average filter (sometimes know as a Boxcar FIR) helps filter out noise from the raw signal. It uses the conversion of history and takes the average value of the conversion and effectively low-pass filters the signal. One filter is provided per channel and the depth of the filter is configurable. A typical depth of 32 has been found to provide a good performance. Due to the low pass effect very long filters will reduce the response time of the QADC.
 
 Scaling
-.......
+-------
 
 Scaling typically means reducing the raw resolution of the ADC from 12 - 13 bits and quantising it to a typical bit resolution such at 8, 9 or 10 bits. This provides a signal which has a know range, for example, 0 - 511 for the 9 bit case. This step also offers the possibility of calibration where the tolerance of the passive components may affect the estimated position of the input.
 
 Hysteresis
-..........
+----------
 
 Even after filtering it may still be possible to see some small noise signal depending on configuration. This may also be exaggerated due to the natural quantisation to a digital value by the QADC, particularly if the setting is close to a transition point. By adding a small hysteresis (say a value of one or two) additional stability can be achieved at the cost of a very small dead zone at the last position. This may desirable if the QADC output is controlling a parameter that may be noticeable if it hunts between one or more positions. The hysteresis is configurable and may be removed completely if needed by setting to 0.
 
@@ -202,17 +203,17 @@ Even after filtering it may still be possible to see some small noise signal dep
 .. _effect_passives:
 
 Comparing the Effect of Passive Component Tolerance on Both Schemes
--------------------------------------------------------------------
+===================================================================
 
 Both schemes offered will work very well when the overall passive component tolerances are good (e.g. 5%). However typical variable resistors/potentiometers are designed to produce good relative resistances rather than absolute resistances and often the end-to-end resistance tolerance can be as high as 20%. The QADC relies more on absolute resistances, particularly the rheostat approach.
 
 When passive component tolerances are poor we see differing effects on the real-life transfer curves of ``actual position`` versus ``estimated position`` depending on the scheme used.
 
-For the ``Rheostat`` approach we see the good linearity and zero scale performance is always retained, however, full scale is directly affected. For example, if the resistor tolerance is 20% too low then the time constant will be smaller than expected and the maximum setting that can be achieved is 80% even at full travel (orange curve). This can be seen in :ref:`the rheostat transfer curve <fig_qadc_rheo_tol>`. If the resistor tolerance is 20% too high then full scale will be achieved at 80% travel and the last 20% of travel will give the same reading of full scale (green curve). 
+For the ``Rheostat`` approach we see the good linearity and zero scale performance is always retained, however, full scale is directly affected. For example, if the resistor tolerance is 20% too low then the time constant will be smaller than expected and the maximum setting that can be achieved is 80% even at full travel (orange curve). This can be seen in :ref:`the rheostat transfer curve <fig_qadc_rheo_tol>`. If the resistor tolerance is 20% too high then full scale will be achieved at 80% travel and the last 20% of travel will give the same reading of full scale (green curve).
 
 The small step close to zero is caused by the QADC not being able to charge the capacitor past the threshold voltage at low setting due to the required series resistor.
 
-If a manufacturing test is an option to calibrate the component values then this is likely the best approach to adopt. 
+If a manufacturing test is an option to calibrate the component values then this is likely the best approach to adopt.
 
 .. _fig_qadc_rheo_tol:
 .. figure:: images/qadc_rheo_tol.png
@@ -221,7 +222,7 @@ If a manufacturing test is an option to calibrate the component values then this
    QADC Rheostat Effect of 20% Tolerance on Transfer Curve
 
 
-The `Potentiometer` approach is more tolerant to the overall end to end resistance since it's operation also relies on the starting potential as well as the equivalent series resistance at any given setting, which itself is a function of the end-to-end track resistance. Even when tolerance is 20% out the end positions will always achieve zero and full scale however linearity is slightly degraded and an inflection point may be seen at around 1/3 of the travel. 
+The `Potentiometer` approach is more tolerant to the overall end to end resistance since it's operation also relies on the starting potential as well as the equivalent series resistance at any given setting, which itself is a function of the end-to-end track resistance. Even when tolerance is 20% out the end positions will always achieve zero and full scale however linearity is slightly degraded and an inflection point may be seen at around 1/3 of the travel.
 
 The curve will always remain monotonic increasing however the effect of noise (present in all ADCs) and the use of post processing (filtering and hysteresis) reduces the real life effect to a point where it may be unnoticeable.
 
@@ -248,7 +249,7 @@ This theoretical behavior has been verified as shown in the :ref:`Hardware Chara
 .. _passive_selection:
 
 Passive Component Selection
----------------------------
+===========================
 
 There are three components to consider when building one channel of QADC.
 
@@ -281,7 +282,7 @@ Typical values recommended are:
 |newpage|
 
 QADC Tuning
------------
+===========
 
 Once the :ref:`passive components <passive_selection>`  have been selected then you can configure your QADC. Both schemes share a common configuration of type ``qadc_config_t`` as shown in the :ref:`API section <api>`.
 
@@ -301,7 +302,7 @@ The passive component selection should be directly inputted into the structure a
 The final three settings require some thought and are described below.
 
 How to set auto_scale
-.....................
+---------------------
 
 Autoscale works by measuring the time taken to reach the conversion result. If it takes longer than expected (full scale for rheostat or 35% setting for potentiometer) then it trims the max value so that the reading can be made more accurate during the following runtime of the QADC (until reset).
 
@@ -313,7 +314,7 @@ Set this value to 0 by default.
 
 
 How to set convert_interval_ticks
-.................................
+---------------------------------
 
 This parameter is only relevant to ``continuous`` mode where a task cycles through the QADCs. It sets the total period per conversion which includes charging the capacitor, measuring the discharge periods and an idle time at the end to allow the capacitor to reach it's natural voltage governed by the external passives.
 
@@ -328,154 +329,134 @@ In ``single shot`` mode this setting is ignored because the API takes the correc
 |newpage|
 
 QADC Usage
-----------
+==========
 
 There are three main modes of operation for the QADC.
 
 Continuous Modes
-................
+----------------
 
 If many channels are needed and ``continuous`` updates are required then it is convenient to run a task which performs background continuous conversion and associated filtering. This requires a dedicated hardware thread.
 
 The values may then be read by the application either:
 
-   - Over a channel (application on same or different tile from the QADC) or 
+   - Over a channel (application on same or different tile from the QADC) or
    - By shared memory (same tile only) using the adc_xxx_state.results member which is a pointer to an array of ``unit16_t`` result values.
 
-The examples included in `the QADC repo <https://github.com/xmos/lib_qadc>`_ under ``/examples`` show both continuous modes in use.
+The examples included in ``/examples`` show both continuous modes in use.
 
 Single Shot Mode
-................
+----------------
 
 A ``single shot`` API is also available which allows a single conversion to be performed by calling a function. Note that the function call is blocking and will return only when the conversion is complete. This will typically take a few hundred microseconds for the recommended passive component selection. Larger RC values result in a longer conversion time.
 
 When infrequent conversions are made using ``single shot`` mode it is recommended to reduce the depth of the moving average filter down (it can be set to 1 and above) to the actual number conversions performed for each desired QADC value.
 
-The examples included in `the QADC repo <https://github.com/xmos/lib_qadc>`_ under ``/examples`` show the single shot mode in use.
+The examples included in ``/examples`` show the single shot mode in use.
 
+**************
+Resource Usage
+**************
 
-|newpage|
+The Rheostat reader requires 3 kB and either one thread (continuous operation) or ~300 microseconds of CPU time per conversion.
 
-.. _api:
+For a two channel, 8 bit (256 output levels) with a 16 entry moving average filter, the Potentiometer reader requires 5 kB and either one thread (continuous operation) or around ~300 microseconds of processing time per conversion.
 
-QADC API
---------
+********************
+Example applications
+********************
 
-Common API
-..........
+Building the examples
+=====================
 
-Common items for both types of QADC are shown here.
+This section assumes that the `XMOS XTC Tools <https://www.xmos.com/software-tools/>`_ have been
+downloaded and installed. The required version is specified in the accompanying ``README``.
 
-.. note::
-    Depending on whether QADC is called from an XC program with a par{} or from C with PAR_JOBS()
-    extra hardware setup may be needed. If using PAR_JOBS() please call qadc_pre_init_c() before 
-    QADC initialisation.
+Installation instructions can be found `here <https://xmos.com/xtc-install-guide>`_.
 
-See the :ref:`QADC Tuning <tuning>` section for more details on setting these values.
+Special attention should be paid to the section on
+`Installation of Required Third-Party Tools <https://www.xmos.com/documentation/XM-014363-PC/html/installation/install-configure/install-tools/install_prerequisites.html>`_.
 
-.. doxygenstruct:: qadc_config_t
-    :members:
+The application is built using the `xcommon-cmake <https://www.xmos.com/file/xcommon-cmake-documentation/?version=latest>`_
+build system, which is provided with the XTC tools and is based on `CMake <https://cmake.org/>`_.
 
-.. doxygengroup:: lib_qadc_common
-   :content-only:
+The ``lib_qadc`` software ZIP package should be downloaded and extracted to a chosen working
+directory.
 
+Ensure that the relevant paramters have been adjusted to match the design:
 
-QADC Rheostat API
-.................
-
-Specific items for the Rheostat QADC are shown here.
-
-
-.. doxygenstruct:: qadc_rheo_state_t
-
-.. doxygengroup:: lib_qadc_rheo_reader
-   :content-only:
-
-QADC Potentiometer API
-......................
-
-Specific items for the Potentiometer QADC are shown here.
-
-.. doxygenstruct:: qadc_pot_state_t
-
-.. doxygengroup:: lib_qadc_pot_reader
-   :content-only:
-
-|newpage|
-
-Building and running the examples
----------------------------------
-
-The examples are designed to run on the ``XK-EVK-XU316`` (XCORE-AI-EXPLORER) kit although any xcore.ai hardware will work (please adjust the QADC ports accordingly).
-
-Ensure a correctly configured installation of the XMOS tools and open an XTC command shell. Please check that the XMOS tools are correctly
-sourced by running the following command::
-
-    $ xcc
-    xcc: no input files
-
-.. note::
-    Instructions for installing and configuring the XMOS tools can be found on `the XMOS web site <https://www.xmos.ai/software-tools/>`_.
-
-Clone the lib_qadc repository::
-
-    git clone git@github.com:xmos/lib_qadc.git
-    cd lib_qadc
-
-Next ensure you have adjusted the relevant paramters for your design:
-
-.. literalinclude:: ../../examples/pot_reader/src/main.xc
+.. literalinclude:: ../../examples/app_pot_reader/src/main.xc
    :start-at: #define NUM_ADC
    :end-at: on tile[1]: port p_adc[]
 
-
-
-.. literalinclude:: ../../examples/pot_reader/src/main.xc
+.. literalinclude:: ../../examples/app_pot_reader/src/main.xc
    :start-at: const unsigned capacitor_pf
    :end-at: const unsigned convert_interval_ticks
 
+To configure the build, the following commands should be run from an XTC command prompt::
 
+    cd lib_qadc/examples/
+    cmake -G "Unix Makefiles" -B build
 
-Run the following commands in the lib_sw_pll/examples directory to build the firmware::
+If any dependencies are missing they will be retrieved automatically during this step.
 
-    cmake -B build -G "Unix Makefiles"
+The application binaries should then be built using ``xmake``::
+
     xmake -j -C build
 
+Binary artifacts (.xe files) will be generated under the appropriate subdirectories of the
+``app_pot_reader/bin`` and ``app_rheo_reader/bin`` directories — one for each supported build
+configuration.
 
-To run the example firmware, first connect the required passive circuitry to the QADC input pins and the run one of the following examples as appropriate::
+For subsequent builds, the ``cmake`` step may be omitted.
+If ``CMakeLists.txt`` or other build files are modified, ``cmake`` will be re-run automatically
+by ``xmake`` as needed.
 
-    xrun --xscope pot_reader/bin/SINGLE/qadc_pot_example_SINGLE.xe
-    xrun --xscope pot_reader/bin/CONTINUOUS_CHAN/qadc_pot_example_CONTINUOUS_CHAN.xe
-    xrun --xscope pot_reader/bin/CONTINUOUS_MEM/qadc_pot_example_CONTINUOUS_MEM.xe
-    xrun --xscope rheo_reader/SINGLE/bin/qadc_rheo_example_SINGLE.xe
-    xrun --xscope rheo_reader/CONTINUOUS_CHAN/bin/qadc_rheo_example_CONTINUOUS_CHAN.xe
-    xrun --xscope rheo_reader/CONTINUOUS_MEM/bin/qadc_rheo_example_CONTINUOUS_MEM.xe
 
+Running the examples
+====================
+
+The examples are designed to run on the XK-EVK-XU316 kit, although any i`xcore.ai` based hardware
+will also work, provided the QADC ports are adjusted accordingly. The required passive circuitry
+should be connected to the QADC input pins.
+
+From an XTC command prompt, one of the following commands should be run from the ``examples``
+directory::
+
+    xrun --xscope app_pot_reader/bin/SINGLE/qadc_pot_example_SINGLE.xe
+    xrun --xscope app_pot_reader/bin/CONTINUOUS_CHAN/qadc_pot_example_CONTINUOUS_CHAN.xe
+    xrun --xscope app_pot_reader/bin/CONTINUOUS_MEM/qadc_pot_example_CONTINUOUS_MEM.xe
+    xrun --xscope app_rheo_reader/SINGLE/bin/qadc_rheo_example_SINGLE.xe
+    xrun --xscope app_rheo_reader/CONTINUOUS_CHAN/bin/qadc_rheo_example_CONTINUOUS_CHAN.xe
+    xrun --xscope app_rheo_reader/CONTINUOUS_MEM/bin/qadc_rheo_example_CONTINUOUS_MEM.xe
 
 In each case the converted QADC values will be periodically printed to the console, for example::
 
     Running QADC in continuous mode using dedicated task!
-    Read channel ch 0: 558, ch 1: 328, 
-    Read channel ch 0: 558, ch 1: 330, 
-    Read channel ch 0: 558, ch 1: 342, 
-    Read channel ch 0: 536, ch 1: 364, 
-    Read channel ch 0: 488, ch 1: 428, 
-    Read channel ch 0: 420, ch 1: 490, 
-    Read channel ch 0: 373, ch 1: 516, 
-    Read channel ch 0: 337, ch 1: 544, 
-    Read channel ch 0: 305, ch 1: 570, 
-    Read channel ch 0: 277, ch 1: 592, 
-    Read channel ch 0: 251, ch 1: 610, 
-    Read channel ch 0: 219, ch 1: 634, 
+    Read channel ch 0: 558, ch 1: 328,
+    Read channel ch 0: 558, ch 1: 330,
+    Read channel ch 0: 558, ch 1: 342,
+    Read channel ch 0: 536, ch 1: 364,
+    Read channel ch 0: 488, ch 1: 428,
+    Read channel ch 0: 420, ch 1: 490,
+    Read channel ch 0: 373, ch 1: 516,
+    Read channel ch 0: 337, ch 1: 544,
+    Read channel ch 0: 305, ch 1: 570,
+    Read channel ch 0: 277, ch 1: 592,
+    Read channel ch 0: 251, ch 1: 610,
+    Read channel ch 0: 219, ch 1: 634,
     ...
 
+Alternatively, the applications can be programmed into flash memory for standalone execution::
+
+    xflash app_pot_reader/bin/SINGLE/qadc_pot_example_SINGLE.xe
 
 |newpage|
 
 .. _characterise:
 
 Hardware Characterisation of QADC Potentiometer Transfer Curve
---------------------------------------------------------------
+==============================================================
 
 A bench characterisation of the QADC potentiometer was conducted to verify the model. A 10 bit ADC was connected to the potentiometer and the voltage reading (reference voltage was logged). The QADC was configured to 10 bits then enabled and the estimated potentiometer setting was logged against the reference.
 
@@ -501,4 +482,53 @@ In this case, less than ideal settings of 10 k for the potentiometer was used (c
 
 It can be seen that, although the linearity is affected by +- 20% tolerance, the transfer curve remains monotonic and the end positions can always be reached. It also confirms that the model closely matches the practical operation of the QADC.
 
-The python model of the QADC may be found in the ``/design`` directory of `the QADC repo <https://github.com/xmos/lib_qadc>`_ and is used in the regression test to ensure the embedded version matches.
+The python model of the QADC may be found in the ``/design`` directory and is used in the regression test to ensure the embedded version matches.
+
+|newpage|
+
+.. _api:
+
+*************
+API Reference
+*************
+
+Common API
+==========
+
+Common items for both types of QADC are shown here.
+
+.. note::
+    Depending on whether QADC is called from an XC program with a par{} or from C with PAR_JOBS()
+    extra hardware setup may be needed. If using PAR_JOBS() call qadc_pre_init_c() before
+    QADC initialisation.
+
+See the :ref:`QADC Tuning <tuning>` section for more details on setting these values.
+
+.. doxygenstruct:: qadc_config_t
+    :members:
+
+.. doxygengroup:: lib_qadc_common
+   :content-only:
+
+
+QADC Rheostat API
+=================
+
+Specific items for the Rheostat QADC are shown here.
+
+
+.. doxygenstruct:: qadc_rheo_state_t
+
+.. doxygengroup:: lib_qadc_rheo_reader
+   :content-only:
+
+QADC Potentiometer API
+======================
+
+Specific items for the Potentiometer QADC are shown here.
+
+.. doxygenstruct:: qadc_pot_state_t
+
+.. doxygengroup:: lib_qadc_pot_reader
+   :content-only:
+

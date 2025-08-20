@@ -1,4 +1,4 @@
-// Copyright 2024 XMOS LIMITED.
+// Copyright 2024-2025 XMOS LIMITED.
 // This Software is subject to the terms of the XMOS Public Licence: Version 1.
 
 #pragma once
@@ -16,9 +16,9 @@
 #endif
 
 
-/** 
+/**
  * @brief   Configuration structure for initialising the QADC. This contains
- *          the passive component definition, voltages, conversion speed ( adc_xxx_task() only ) 
+ *          the passive component definition, voltages, conversion speed ( adc_xxx_task() only )
  *          and mode.
  */
 typedef struct qadc_config_t{
@@ -33,13 +33,13 @@ typedef struct qadc_config_t{
     /** Voltage of the input threshold. This is nominally 1.15 volts for a 3.3 volt rail. */
     float v_thresh;
     /** Boolean setting which allows the largest time seen by the conversion to be trimmed if it
-     *  exceeds the expected value. The new end point will be kept until the task is re-started. 
-     *  It can account for cases where the RC delay constant is much larger than expected. 
-     *  Note no scheme is available for detecting the case where the RC constant is shorter 
-     *  than expected. */ 
+     *  exceeds the expected value. The new end point will be kept until the task is re-started.
+     *  It can account for cases where the RC delay constant is much larger than expected.
+     *  Note no scheme is available for detecting the case where the RC constant is shorter
+     *  than expected. */
     char auto_scale;
     /** The full conversion cycle time per channel (adc_xxx_task() only). The task will assert
-     *  at initialisation if this is too short. This setting is ignored in single-shot mode.*/    
+     *  at initialisation if this is too short. This setting is ignored in single-shot mode.*/
     unsigned convert_interval_ticks;
 }qadc_config_t;
 
@@ -68,12 +68,12 @@ typedef struct qadc_config_t{
 #define QADC_CMD_MASK                0xff000000ULL
 
 
-/** 
+/**
  * @brief   Fixed point type used internally by QADC.
  */
 typedef uint16_t         qadc_q3_13_fixed_t;
 
-/** 
+/**
  * @brief   The shift value needed to work with qadc_q3_13_fixed_t
  */
 #define QADC_Q_3_13_SHIFT    13
@@ -81,12 +81,12 @@ typedef uint16_t         qadc_q3_13_fixed_t;
 /**
  * Perform xcore resource setup if QADC is to be used from C with lib_xcore PAR_JOBS().
  * Because QADC is written in XC it expects ports to be enabled and an XC timer to
- * be available. This pre-init function meets those needs if using from a lib_xcore 
+ * be available. This pre-init function meets those needs if using from a lib_xcore
  * based project
  *
  * \param p_adc          An array of ports used for conversion.
  * \param num_adc        The number of QADC channels used
- */ 
+ */
 void qadc_pre_init_c(port p_adc[], size_t num_adc);
 
 

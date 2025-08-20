@@ -1,20 +1,23 @@
+# This file relates to internal XMOS infrastructure and should be ignored by external users
+
 ---
 lib_name: lib_qadc
 project: '{{lib_name}}'
-title: '{{lib_name}}: XMOS QADC Library'
-version: 1.0.0
+title: '{{lib_name}}: Quasi ADC using GPIO'
+version: 1.0.1
 
 documentation:
   exclude_patterns_path: doc/exclude_patterns.inc
-  substitutions_path: doc/substitutions.inc
-  root_doc: doc/rst/qadc.rst
+  root_doc: doc/rst/lib_qadc.rst
   linkcheck_ignore_regex: ['']
+  latex_toc_depth: 3
+  latex_secnum_depth: 3
   cognidox_part_number: XM-015184-UG
   doxygen_projects:
     lib_qadc:
       doxyfile_path: doc/Doxyfile.inc
   pdfs:
-    doc/rst/qadc.rst:
+    doc/rst/lib_qadc.rst:
       pdf_title: '{{title}}'
       pdf_filename: '{{lib_name}}_v{{version}}'
     README.rst:

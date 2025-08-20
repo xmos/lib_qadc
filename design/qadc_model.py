@@ -1,6 +1,5 @@
-# Copyright 2024 XMOS LIMITED.
+# Copyright 2024-2025 XMOS LIMITED.
 # This Software is subject to the terms of the XMOS Public Licence: Version 1.
-#This Software is subject to the terms of the XMOS Public Licence: Version 1.
 
 import matplotlib.pyplot as plt
 import math
@@ -61,7 +60,7 @@ class qadc_rheo:
             # Calculate time to for cap to reach threshold from charge volatage
             logval_down = 1 - (v_charge_h - v_thresh) / (v_charge_h + phi)
             t_down = 0 if logval_down <= 0 else (-r_pot) * capacitor_f * math.log(logval_down)
-        
+
             # Convert to 100MHz timer ticks
             t_down_ticks = 0 if t_down < 0 else int(t_down * XS1_TIMER_HZ)
 
@@ -95,7 +94,7 @@ class qadc_rheo:
 
     def get_ticks_and_dir_from_posn(self, posn, v_thresh_noise_mv=0.0001):
         idx = int(posn * (self.n_lookup - 1))
-        
+
         #this is ignored for now in this class
         v_thresh_noise = np.random.triangular(-v_thresh_noise_mv/1000, 0, v_thresh_noise_mv/1000, 1)
         ticks = self.down[idx]
